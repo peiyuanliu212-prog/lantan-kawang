@@ -147,6 +147,9 @@ nav.tabs button.on{color:var(--gold);text-shadow:0 0 12px rgba(245,166,35,.45)}
 #startOverlay .crown,#startOverlay .logo,#startOverlay .en-sub,#startOverlay .slogan,#startOverlay .notice{display:none}
 #startOverlay{justify-content:flex-end;padding:0;background-position:50% 50%}
 #giftBtn.hot,#enterBtn.hot{position:absolute;left:4%;right:4%;bottom:1.6%;height:6.4%;width:auto;background:transparent;border:none;box-shadow:none;color:transparent;text-shadow:none;animation:none;border-radius:20px}
+.pickava{width:46px;height:46px;border-radius:50%;overflow:hidden;flex:0 0 46px;display:flex;align-items:center;justify-content:center;background:linear-gradient(140deg,#2c3e70,#16224a);font-weight:800;font-size:13px;color:#ffe9c9;border:1.5px solid rgba(255,255,255,.35)}
+.pickava img{width:100%;height:100%;object-fit:cover;object-position:50% 18%;display:block}
+.picknm{flex:1;margin:0 10px;text-align:left}
 
 </style>
 </head>
@@ -1787,7 +1790,7 @@ window.COVER_BG = COVER_BG;
     instances.slice(0, 40).forEach(function (ins) {
       var c = E.CARDS[ins.cardId];
       var row = document.createElement('div'); row.className = 'row';
-      row.innerHTML = '<span>' + c.name + '（' + c.pos + ' ' + c.rar + ' ' + c.rating + ' · ' + ins.num + '）</span>';
+      row.innerHTML = '<span class="pickava">' + faceHTML(c, false) + '</span><span class="picknm">' + c.name + '（' + c.pos + ' ' + c.rar + ' ' + c.rating + ' · ' + ins.num + '）</span>';
       var b = document.createElement('button'); b.textContent = '选他';
       b.onclick = function () { $('pickModal').classList.remove('on'); onPick(ins); };
       row.appendChild(b);
