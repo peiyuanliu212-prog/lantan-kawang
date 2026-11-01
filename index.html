@@ -39,6 +39,11 @@ main{padding:14px 14px calc(76px + env(safe-area-inset-bottom,0px))}
 .card .cnt{position:absolute;top:4px;right:6px;background:rgba(0,0,0,.45);border-radius:8px;font-size:10px;padding:1px 6px}
 .card .newb{position:absolute;top:4px;left:6px;background:#e33;color:#fff;border-radius:8px;font-size:10px;padding:1px 6px;font-weight:700}
 .card.unlit{border-color:#232f57;background:#131c3d;color:#54628c}.card.unlit .face{background:#1b274e;color:#3d4c7d}
+.card.unlit.rar-普通 .face{color:rgba(154,163,173,.75);box-shadow:inset 0 0 0 1.5px rgba(154,163,173,.35)}
+.card.unlit.rar-稀有 .face{color:rgba(77,163,255,.8);box-shadow:inset 0 0 0 1.5px rgba(77,163,255,.4)}
+.card.unlit.rar-史诗 .face{color:rgba(176,107,255,.85);box-shadow:inset 0 0 0 1.5px rgba(176,107,255,.45)}
+.card.unlit.rar-传说 .face{color:rgba(255,159,46,.9);box-shadow:inset 0 0 0 1.5px rgba(255,159,46,.5)}
+.card.unlit.rar-传世 .face{color:rgba(255,217,77,.95);box-shadow:inset 0 0 0 1.5px rgba(255,217,77,.55)}
 .rar-普通{border-color:var(--r0)}.rar-普通 .face{background:linear-gradient(140deg,#5b6570,#39424c)}
 .rar-稀有{border-color:var(--r1)}.rar-稀有 .face{background:linear-gradient(140deg,#2c6fd1,#173f7d)}
 .rar-史诗{border-color:var(--r2)}.rar-史诗 .face{background:linear-gradient(140deg,#8a3ffc,#4c1d95)}
@@ -55,13 +60,15 @@ main{padding:14px 14px calc(76px + env(safe-area-inset-bottom,0px))}
 #startOverlay .logo{font-size:46px;font-weight:900;letter-spacing:4px;background:linear-gradient(180deg,#ffe9a8,var(--gold) 55%,#c8890a);-webkit-background-clip:text;background-clip:text;color:transparent}
 #startOverlay .slogan{color:var(--accent);margin:10px 0 22px;font-size:15px;letter-spacing:2px}
 #startOverlay .notice{background:rgba(16,26,56,.85);border:1px solid var(--line);border-radius:12px;padding:12px 16px;font-size:12.5px;color:var(--dim);line-height:1.8;max-width:340px;margin-bottom:22px;text-align:left}
-.toast{position:fixed;top:64px;left:50%;transform:translateX(-50%);background:#22315f;border:1px solid var(--line);color:var(--ink);padding:9px 16px;border-radius:20px;font-size:13px;z-index:80;display:none}
+.toast{position:fixed;top:calc(130px + var(--safe-top,0px));left:50%;transform:translateX(-50%);background:#22315f;border:1px solid var(--line);color:var(--ink);padding:9px 16px;border-radius:20px;font-size:13px;z-index:80;display:none;white-space:nowrap;max-width:92vw;text-overflow:ellipsis;overflow:hidden}
 select{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:7px}
 
 /* 球场站位(阵容页) */
-.court{position:relative;height:340px;border-radius:16px;border:2px solid #c8890a;background:
+.court{position:relative;height:340px;border-radius:16px;border:2px solid #a86e06;background:
   radial-gradient(circle at 50% 6%,transparent 52px,rgba(255,255,255,.14) 53px,transparent 54px),
-  linear-gradient(180deg,#8a5a1d,#6e4513);overflow:hidden}
+  repeating-linear-gradient(90deg,rgba(0,0,0,.07) 0 2px,transparent 2px 54px),
+  repeating-linear-gradient(0deg,rgba(255,255,255,.025) 0 3px,transparent 3px 9px),
+  linear-gradient(180deg,#7d5415,#5f3d0e);overflow:hidden}
 .court:before{content:"";position:absolute;left:50%;top:0;width:120px;height:64px;border:2px solid rgba(255,255,255,.25);border-top:none;transform:translateX(-50%)}
 .court .slot{position:absolute;width:86px;transform:translate(-50%,-50%);text-align:center;cursor:pointer}
 .court .slot .disc{width:52px;height:52px;margin:0 auto;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;color:#fff;border:2px solid rgba(255,255,255,.5);background:#39424c}
@@ -1945,29 +1952,65 @@ window.PACKIMG = {"normal": "data:image/webp;base64,UklGRrhoAABXRUJQVlA4IKxoAADw
   }
   function drawShareCard() {
     if (!lastResult) return;
-    var cv = $('shareCanvas'), ctx = cv.getContext('2d');
-    var grad = ctx.createLinearGradient(0, 0, 0, 1000); grad.addColorStop(0, '#16224a'); grad.addColorStop(1, '#0a0f22');
-    ctx.fillStyle = grad; ctx.fillRect(0, 0, 750, 1000);
-    ctx.strokeStyle = '#f5a623'; ctx.lineWidth = 6; ctx.strokeRect(18, 18, 714, 964);
-    ctx.fillStyle = '#f5a623'; ctx.font = '900 64px sans-serif'; ctx.textAlign = 'center';
-    ctx.fillText('篮坛卡王', 375, 110);
-    ctx.fillStyle = '#aebadd'; ctx.font = '28px sans-serif';
-    ctx.fillText('开包抽乔丹 · 追 1/1 当卡王', 375, 158);
     var rarColor = { '普通': '#9aa5b1', '稀有': '#4da3ff', '史诗': '#b07dff', '传说': '#ffb84d', '传世': '#ffe14d' };
-    var y = 220;
-    lastResult.cards.forEach(function (card, i) {
-      var ins = lastResult.instances[i];
-      ctx.fillStyle = 'rgba(255,255,255,0.06)'; ctx.fillRect(70, y, 610, 104);
-      ctx.fillStyle = rarColor[card.rar]; ctx.font = '900 40px sans-serif'; ctx.textAlign = 'left';
-      ctx.fillText(card.name, 96, y + 52);
-      ctx.fillStyle = '#dfe6ff'; ctx.font = '26px sans-serif';
-      ctx.fillText(card.pos + ' · ' + card.rar + ' ' + card.rating + ' · ' + ins.num + (ins.par !== 'base' ? ' · ' + ins.par : '') + ' · 身价 ' + ins.value, 96, y + 90);
-      y += 122;
+    // 本包最佳卡作主视觉(同档取身价高者)
+    var bi = 0;
+    lastResult.cards.forEach(function (c, ix) {
+      var a = lastResult.cards[bi], ia = lastResult.instances[bi], ic = lastResult.instances[ix];
+      if ((RAR_RANK[c.rar] || 0) > (RAR_RANK[a.rar] || 0) || (c.rar === a.rar && ic.value > ia.value)) bi = ix;
     });
-    ctx.textAlign = 'center'; ctx.fillStyle = '#8fa0c8'; ctx.font = '24px sans-serif';
-    ctx.fillText((state.title ? '👑 卡王 · ' : '') + '图鉴 ' + E.litCount(state) + '/120 · ' + dayStr(), 375, 950);
-
-    $('shareModal').classList.add('on');
+    var best = lastResult.cards[bi], bins = lastResult.instances[bi];
+    var src = window.PORTRAITS && window.PORTRAITS[best.id + 1];
+    function paint(img) {
+      var cv = $('shareCanvas'), ctx = cv.getContext('2d');
+      var grad = ctx.createLinearGradient(0, 0, 0, 1000); grad.addColorStop(0, '#16224a'); grad.addColorStop(1, '#0a0f22');
+      ctx.fillStyle = grad; ctx.fillRect(0, 0, 750, 1000);
+      ctx.fillStyle = '#ffd94d'; ctx.font = '900 62px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText('篮坛卡王', 375, 104);
+      ctx.fillStyle = '#aebadd'; ctx.font = '27px sans-serif';
+      ctx.fillText('开包抽乔丹 · 追 1/1 当卡王', 375, 150);
+      ctx.fillStyle = 'rgba(255,217,77,.5)'; ctx.fillRect(90, 178, 570, 2);
+      // 主卡区:左肖像 288x384,右信息
+      ctx.save();
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(56, 214, 288, 384, 14); else ctx.rect(56, 214, 288, 384);
+      ctx.clip();
+      if (img) ctx.drawImage(img, 56, 214, 288, 384);
+      else { ctx.fillStyle = '#22315f'; ctx.fillRect(56, 214, 288, 384); ctx.fillStyle = '#8fa0c8'; ctx.font = '900 110px sans-serif'; ctx.fillText(best.en ? best.en.slice(0, 2).toUpperCase() : '?', 200, 440); }
+      ctx.restore();
+      ctx.strokeStyle = rarColor[best.rar]; ctx.lineWidth = 4;
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(56, 214, 288, 384, 14); else ctx.rect(56, 214, 288, 384);
+      ctx.stroke();
+      ctx.textAlign = 'left';
+      ctx.fillStyle = rarColor[best.rar]; ctx.font = '900 46px sans-serif';
+      ctx.fillText(best.name, 376, 292);
+      ctx.fillStyle = '#dfe6ff'; ctx.font = '30px sans-serif';
+      ctx.fillText(best.pos + ' · ' + best.rar + ' ' + best.rating, 376, 344);
+      ctx.fillText(bins.num + (bins.par !== 'base' ? ' · ' + bins.par : ''), 376, 392);
+      ctx.fillStyle = '#8fa0c8'; ctx.font = '26px sans-serif';
+      ctx.fillText('身价', 376, 472);
+      ctx.fillStyle = '#ffd94d'; ctx.font = '900 64px sans-serif';
+      ctx.fillText(String(bins.value), 376, 540);
+      // 其余卡列表
+      var y = 648;
+      lastResult.cards.forEach(function (card, ix) {
+        if (ix === bi) return;
+        var ins = lastResult.instances[ix];
+        ctx.fillStyle = 'rgba(255,255,255,0.06)'; ctx.fillRect(56, y, 638, 62);
+        ctx.fillStyle = rarColor[card.rar]; ctx.font = '700 28px sans-serif'; ctx.textAlign = 'left';
+        ctx.fillText(card.name, 78, y + 40);
+        ctx.fillStyle = '#c6cfee'; ctx.font = '24px sans-serif'; ctx.textAlign = 'right';
+        ctx.fillText(card.pos + ' · ' + card.rar + ' ' + card.rating + ' · ' + ins.num + ' · 身价 ' + ins.value, 672, y + 40);
+        ctx.textAlign = 'left';
+        y += 72;
+      });
+      ctx.textAlign = 'center'; ctx.fillStyle = '#8fa0c8'; ctx.font = '24px sans-serif';
+      ctx.fillText((state.title ? '👑 卡王 · ' : '') + '图鉴 ' + E.litCount(state) + '/120 · ' + dayStr().replace(/-(\d)(?=-|$)/g, '-0$1'), 375, 956);
+      $('shareModal').classList.add('on');
+    }
+    if (src) { var im = new Image(); im.onload = function () { paint(im); }; im.onerror = function () { paint(null); }; im.src = src; }
+    else paint(null);
   }
 
   // ---------- 事件 ----------
