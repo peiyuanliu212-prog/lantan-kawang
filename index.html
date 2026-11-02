@@ -187,6 +187,21 @@ nav.tabs button .ti{font-size:19px;line-height:1.1;filter:grayscale(.4);opacity:
 nav.tabs button.on{background:var(--accent);color:#231303;font-weight:800;border-radius:0}
 nav.tabs button.on .ti{filter:none;opacity:1}
 
+#slotLayer{position:absolute;left:12px;right:12px;bottom:2.2%;z-index:2;text-align:left}
+.slotTitle{color:var(--gold);font-weight:800;font-size:14px;margin:0 2px 8px;text-shadow:0 1px 6px rgba(0,0,0,.8)}
+#slotList{display:flex;flex-direction:column;gap:8px}
+.slotcard{display:flex;align-items:center;gap:10px;background:rgba(9,14,34,.9);border:1px solid var(--line);border-radius:12px;padding:9px 12px}
+.slotcard.active{border-color:var(--gold)}
+.slotcard .sno{font-weight:900;color:var(--gold);font-size:17px}
+.slotcard .sinfo{flex:1;min-width:0}
+.slotcard .sname{font-weight:700;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.slotcard .smeta{color:var(--dim);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.slotcard .sbtns{display:flex;gap:6px;flex-shrink:0}
+.slotcard .sbtns button{padding:7px 13px;font-size:13px}
+
+#startOverlay.hasbg .crown,#startOverlay.hasbg .logo,#startOverlay.hasbg .en-sub,#startOverlay.hasbg .slogan,#startOverlay.hasbg .notice{display:none}
+#slotLayer{padding:30px 12px 0;margin:0 -12px -6px;background:linear-gradient(180deg,rgba(7,11,26,0) 0%,rgba(7,11,26,.88) 34%,rgba(7,11,26,.97) 100%)}
+
 </style>
 </head>
 <body>
@@ -197,8 +212,7 @@ nav.tabs button.on .ti{filter:none;opacity:1}
   <div class="en-sub">BASKETBALL CARD KING</div>
   <div class="slogan">开包抽乔丹，追 1/1 当卡王！</div>
   <div class="notice"><div class="nc-t">👑 更新公告（虎扑版）</div><div class="nc-i">云存档同步：换设备也能接着当卡王</div><div class="nc-i">晒单卡可一键发帖到虎扑，和 JR 们比比谁手气好</div><div class="nc-i">签到、每日任务、成就与套卡全上线，集满传世授「卡王」</div></div>
-  <button id="giftBtn" style="display:none">🎁 领取新手礼包 »</button>
-  <button id="enterBtn">进入卡店 »</button>
+  <div id="slotLayer"><div class="slotTitle">🏀 选择存档</div><div id="slotList"></div></div>
 </div>
 
 <header class="top">
@@ -207,7 +221,7 @@ nav.tabs button.on .ti{filter:none;opacity:1}
     <div class="pity"><span id="pityText"></span><i><em id="pityFill"></em></i></div>
   </div>
   <div class="brandbox">
-    <div class="brand">篮坛卡王 <button id="muteBtn" class="mute" title="音乐/音效开关">🔊</button></div>
+    <div class="brand">篮坛卡王 <button id="homeBtn" class="mute" title="回开始页换存档">🏠</button> <button id="muteBtn" class="mute" title="音乐/音效开关">🔊</button></div>
     <div class="slogan">概率全公示 · 无充值</div>
     <div class="owner" id="ownerBadge">🏪 卡店店主</div>
   </div>
@@ -1460,10 +1474,12 @@ window.PAGEIMG = {"store": "data:image/webp;base64,UklGRh6IAABXRUJQVlA4IBKIAADQt
 
 </script>
 <script>
-// 存档:localStorage lantan_save_v1(与各前作隔离),含 version 与迁移入口
+// 存档:localStorage 三档位(对标《足坛卡王》v6)lantan_save_v1_s1/s2/s3 + meta 记当前档;旧单档 lantan_save_v1 自动迁移到档位 1(原键保留防回滚)
 (function (global) {
   'use strict';
-  var KEY = 'lantan_save_v1';
+  var LEGACY_KEY = 'lantan_save_v1';
+  var META_KEY = 'lantan_save_meta';
+  function slotKey(n) { return 'lantan_save_v1_s' + n; }
   var V2_DEFAULTS = function () {
     return { display: [], lineup: { PG: null, SG: null, SF: null, PF: null, C: null },
       aceUid: null, tactic: '阵地半场', division: 0, stars: 0, streak: 0,
@@ -1488,6 +1504,18 @@ window.PAGEIMG = {"store": "data:image/webp;base64,UklGRh6IAABXRUJQVlA4IBKIAADQt
     if (state.version === 3) return state;
     return null; // 未知版本不硬读,走新档
   }
+  function getMeta() {
+    try { var m = JSON.parse(global.localStorage.getItem(META_KEY)); if (m && m.active >= 1 && m.active <= 3) return m; } catch (e) {}
+    return { active: 1 };
+  }
+  function setActive(n) { try { global.localStorage.setItem(META_KEY, JSON.stringify({ active: n })); } catch (e) {} }
+  function migrateLegacy() {
+    try {
+      if (!global.localStorage.getItem(slotKey(1)) && global.localStorage.getItem(LEGACY_KEY)) {
+        global.localStorage.setItem(slotKey(1), global.localStorage.getItem(LEGACY_KEY));
+      }
+    } catch (e) {}
+  }
   // 存档码:导出/导入(规格 §12:完整 JSON 文本码+校验和,版本不符明确提示)
   function checksum(str) { var h = 5381; for (var i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0; return (h >>> 0).toString(36); }
   function exportCode(state) {
@@ -1508,18 +1536,42 @@ window.PAGEIMG = {"store": "data:image/webp;base64,UklGRh6IAABXRUJQVlA4IBKIAADQt
     } catch (e) { return { ok: false, err: '存档码解析失败' }; }
   }
   var Save = {
-    KEY: KEY,
-    load: function () {
+    KEY: LEGACY_KEY,
+    slotKey: slotKey,
+    getMeta: getMeta,
+    setActive: setActive,
+    load: function (slot) {
+      migrateLegacy();
+      var n = slot || getMeta().active;
       try {
-        var raw = global.localStorage && global.localStorage.getItem(KEY);
+        var raw = global.localStorage && global.localStorage.getItem(slotKey(n));
         if (!raw) return null;
         return migrate(JSON.parse(raw));
       } catch (e) { return null; }
     },
-    save: function (state) {
-      try { global.localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
+    save: function (state, slot) {
+      var n = slot || getMeta().active;
+      try { state.savedAt = Date.now(); global.localStorage.setItem(slotKey(n), JSON.stringify(state)); } catch (e) {}
     },
-    clear: function () { try { global.localStorage.removeItem(KEY); } catch (e) {} },
+    wipe: function (slot) {
+      var n = slot || getMeta().active;
+      try { global.localStorage.removeItem(slotKey(n)); } catch (e) {}
+    },
+    slotInfo: function (n) { // 开始页档位卡摘要:轻读关键字段,不走完整迁移
+      migrateLegacy();
+      try {
+        var raw = global.localStorage.getItem(slotKey(n));
+        if (!raw) return null;
+        var st = JSON.parse(raw);
+        if (!Array.isArray(st.cards)) return null;
+        var seen = {}, dex = 0;
+        st.cards.forEach(function (c) { if (!seen[c.cardId]) { seen[c.cardId] = 1; dex++; } });
+        return { lv: st.level || 1, gold: st.gold || 0, dia: st.dia || 0, dex: dex,
+          pity: (st.pity && st.pity.ss) || 0, savedAt: st.savedAt || st.createdAt || 0,
+          giftPending: !st.giftClaimed };
+      } catch (e) { return null; }
+    },
+    clear: function () { try { global.localStorage.removeItem(slotKey(getMeta().active)); } catch (e) {} },
     exportCode: exportCode,
     importCode: importCode,
   };
@@ -2205,7 +2257,7 @@ window.PAGEIMG = {"store": "data:image/webp;base64,UklGRh6IAABXRUJQVlA4IBKIAADQt
   $('importCodeBtn').onclick = function () {
     var code = $('saveCodeBox').value;
     if (!code.trim()) { toast('先把存档码粘贴到框里'); return; }
-    if (!confirm('导入将覆盖当前存档，确认？')) return;
+    if (!confirm('导入将覆盖当前档位存档，确认？')) return;
     var r = S.importCode(code);
     if (!r.ok) { toast(r.err); return; }
     state = r.state; save(); renderAll(); toast('存档导入成功');
@@ -2224,24 +2276,50 @@ window.PAGEIMG = {"store": "data:image/webp;base64,UklGRh6IAABXRUJQVlA4IBKIAADQt
   $('detailClose').onclick = function () { $('detailModal').classList.remove('on'); };
   $('pickClose').onclick = function () { $('pickModal').classList.remove('on'); };
 
-  if (!state.giftClaimed) {
-    $('giftBtn').style.display = 'block'; $('enterBtn').style.display = 'none';
-    $('giftBtn').onclick = function () {
-      var before = litSet();
-      var r = E.claimGift(state, Math.random);
-      if (r.ok) {
-        noteDraws({ instances: r.cards.map(function (x) { return x.instance; }) }, false);
-        save();
-        showResult({ cards: r.cards.map(function (x) { return x.card; }), instances: r.cards.map(function (x) { return x.instance; }) }, before);
-        $('giftBtn').style.display = 'none'; $('enterBtn').style.display = 'block'; renderAll();
-      }
-    };
+  // ---- 三档位存档(对标足坛 v6):开始页选档,进档未领礼包自动弹出 ----
+  function claimGiftFlow() {
+    var before = litSet();
+    var r = E.claimGift(state, Math.random);
+    if (r.ok) {
+      noteDraws({ instances: r.cards.map(function (x) { return x.instance; }) }, false);
+      save();
+      showResult({ cards: r.cards.map(function (x) { return x.card; }), instances: r.cards.map(function (x) { return x.instance; }) }, before);
+      renderAll();
+    }
   }
-  $('enterBtn').onclick = function () { if (window.LT_AUDIO) { window.LT_AUDIO.unlock(); window.LT_AUDIO.startBgm(); } $('startOverlay').style.display = 'none'; renderAll(); };
+  function fmtSlotTime(ts) { var d = new Date(ts); return (d.getMonth() + 1) + '-' + d.getDate() + ' ' + ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2); }
+  function renderSlots() {
+    var box = $('slotList'); if (!box) return;
+    var active = S.getMeta().active, html = '';
+    for (var n = 1; n <= 3; n++) {
+      var info = S.slotInfo(n);
+      if (!info) html += '<div class="slotcard"><div class="sno">0' + n + '</div><div class="sinfo"><div class="sname">空卡店</div><div class="smeta">还没开业 · 新店送新手大礼包</div></div><div class="sbtns"><button data-enter="' + n + '">开新店</button></div></div>';
+      else if (info.giftPending) html += '<div class="slotcard' + (n === active ? ' active' : '') + '"><div class="sno">0' + n + '</div><div class="sinfo"><div class="sname">新卡店 · 待开业</div><div class="smeta">🎁 新手大礼包还没领</div></div><div class="sbtns"><button data-enter="' + n + '">进入领礼包</button><button class="ghost" data-del="' + n + '">删档</button></div></div>';
+      else html += '<div class="slotcard' + (n === active ? ' active' : '') + '"><div class="sno">0' + n + '</div><div class="sinfo"><div class="sname">卡店 Lv.' + info.lv + (n === active ? '（当前）' : '') + '</div><div class="smeta">🪙 ' + info.gold + ' · 💎 ' + info.dia + ' · 图鉴 ' + info.dex + '/120 · 保底 ' + info.pity + '/240' + (info.savedAt ? ' · ' + fmtSlotTime(info.savedAt) : '') + '</div></div><div class="sbtns"><button data-enter="' + n + '">进入</button><button class="ghost" data-del="' + n + '">删档</button></div></div>';
+    }
+    box.innerHTML = html;
+  }
+  function enterSlot(n) {
+    S.setActive(n);
+    state = S.load(n) || E.newState();
+    if (!state.startDay) state.startDay = dayStr();
+    save(); tick();
+    if (window.LT_AUDIO) { window.LT_AUDIO.unlock(); window.LT_AUDIO.startBgm(); }
+    $('startOverlay').style.display = 'none';
+    renderAll();
+    if (!state.giftClaimed) claimGiftFlow();
+  }
+  $('slotList').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.enter) enterSlot(+b.dataset.enter);
+    else if (b.dataset.del) { if (confirm('删除该存档？删了不能恢复')) { S.wipe(+b.dataset.del); renderSlots(); toast('存档已删除'); } }
+  });
+  $('homeBtn').onclick = function () { save(); renderSlots(); $('startOverlay').style.display = ''; window.scrollTo(0, 0); };
+  renderSlots();
   // M5:加载页淡出 / 开始页主视觉(乔丹肖像原画,零新增体积) / 静音开关 / 全局点击音
   setTimeout(function () { var bs = $('bootSplash'); if (bs) { bs.classList.add('bye'); setTimeout(function () { bs.remove(); }, 500); } }, 650);
   (function () {
-    if (window.COVER_BG) { $('startOverlay').style.backgroundImage = 'url(' + window.COVER_BG + ')'; $('giftBtn').classList.add('hot'); $('enterBtn').classList.add('hot'); }
+    if (window.COVER_BG) { $('startOverlay').style.backgroundImage = 'url(' + window.COVER_BG + ')'; $('startOverlay').classList.add('hasbg'); }
     var AU = window.LT_AUDIO;
     if (AU) {
       var mb = $('muteBtn');
