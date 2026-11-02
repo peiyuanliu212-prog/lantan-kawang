@@ -236,7 +236,7 @@ nav.tabs button.on .ti{filter:none;opacity:1}
     </div>
     <div class="pack"><h3>🎁 每日福利（广告纯自愿，不看广告可完整游玩）</h3>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
-        <button class="ghost" id="adDiaBtn">📺 看广告 +5 钻石</button>
+        <button class="ghost" id="adDiaBtn">📺 看广告 +10 钻石</button>
         <button class="ghost" id="adChestBtn">📺 看广告 体验抽传世箱</button>
         <button class="ghost" id="adIdleBtn">📺 看广告 挂机双倍领取</button>
       </div>
@@ -267,7 +267,7 @@ nav.tabs button.on .ti{filter:none;opacity:1}
   <section class="page" id="page-league">
     <div class="pagehero" id="hero-league"></div>
     <div class="pack"><h3>🏀 联赛</h3><div id="leagueInfo" style="margin-top:8px;font-size:14px;line-height:1.9"></div>
-      <div style="margin-top:10px"><button id="playBtn" style="font-size:16px;padding:12px 26px">开赛</button> <button id="adLeagueBtn" class="ghost">看广告 +3 场</button></div>
+      <div style="margin-top:10px"><button id="playBtn" style="font-size:16px;padding:12px 26px">开赛</button> <button id="quickBtn">快速 ×5</button> <button id="adLeagueBtn" class="ghost">📺 看广告 +10 场</button></div>
     </div>
     <div class="pack" id="matchPack" style="display:none"><h3 id="matchTitle"></h3>
       <div id="quarterBody" style="font-size:15px;line-height:2;margin-top:6px"></div>
@@ -397,7 +397,7 @@ if (typeof window!=="undefined") window.PORTRAITS = PORTRAITS;
       giftClaimed: false, daily: { freeDay: '', freeAdDay: '' }, createdAt: Date.now(),
       display: [], lineup: { PG: null, SG: null, SF: null, PF: null, C: null },
       aceUid: null, tactic: '阵地半场', division: 0, stars: 0, streak: 0,
-      matchesLeft: 5, matchDay: '', idleLast: Date.now(), idleAdUsed: 0, idleAdDay: '',
+      matchesLeft: 20, matchDay: '', startDay: dayNow(), idleLast: Date.now(), idleAdUsed: 0, idleAdDay: '',
       weekKey: '', weeklyPending: null,
       market: { day: '', factors: {}, hotWeek: '', hot: [] }, commission: null,
       title: '', meta: {}, ads: { day: '', counts: {}, total: 0, pending: null } };
@@ -483,10 +483,10 @@ if (typeof window!=="undefined") window.PORTRAITS = PORTRAITS;
     return { ok: true, pack: packId, cards: cards, instances: instances };
   }
 
-  // 新手礼包:1500金币+40钻+首发五人组(五位置各1,1史诗+4稀有),不计保底抽数
+  // 新手礼包:4000金币+80钻+首发五人组(五位置各1,1史诗+4稀有),不计保底抽数(对标足坛现行口径)
   function claimGift(state, rng) {
     if (state.giftClaimed) return { ok: false, err: '已领取' };
-    state.giftClaimed = true; state.gold += 1500; state.dia += 40;
+    state.giftClaimed = true; state.gold += 4000; state.dia += 80;
     var positions = ['PG', 'SG', 'SF', 'PF', 'C'], epicPos = pick(positions, rng), out = [];
     positions.forEach(function (pos) {
       var rar = (pos === epicPos) ? '史诗' : '稀有';
@@ -506,7 +506,9 @@ if (typeof window!=="undefined") window.PORTRAITS = PORTRAITS;
     return r;
   }
 
-  function sellValue(ins) { return Math.floor(ins.value * 0.85); }
+  function dayNow() { var d = new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); }
+  function sellRate(state) { return state.startDay && state.startDay === dayNow() ? 0.85 : 0.5; } // 开业首日85%高价回收,次日起50%(足坛实测防通胀口径)
+  function sellValue(state, ins) { if (ins === undefined) { ins = state; state = null; } return Math.floor(ins.value * (state ? sellRate(state) : 0.5)); }
   function cardOf(ins) { return CARDS[ins.cardId]; }
   function clearRefs(state, uid) {
     state.display = (state.display || []).filter(function (u) { return u !== uid; });
@@ -518,7 +520,7 @@ if (typeof window!=="undefined") window.PORTRAITS = PORTRAITS;
   function sellCard(state, uid, priceOverride) {
     var i = state.cards.findIndex(function (c) { return c.uid === uid; });
     if (i < 0) return { ok: false, err: '卡不存在' };
-    var ins = state.cards[i], v = (typeof priceOverride === 'number') ? priceOverride : sellValue(ins);
+    var ins = state.cards[i], v = (typeof priceOverride === 'number') ? priceOverride : sellValue(state, ins);
     state.cards.splice(i, 1); state.gold += v;
     clearRefs(state, uid);
     return { ok: true, gold: v };
@@ -533,7 +535,7 @@ if (typeof window!=="undefined") window.PORTRAITS = PORTRAITS;
       list.slice(1).forEach(function (ins) {
         var card = cardOf(ins);
         if (card.rar === '传世' || ins.num === '/1') { skipped++; return; }
-        removeUids[ins.uid] = 1; sold++; gold += sellValue(ins);
+        removeUids[ins.uid] = 1; sold++; gold += sellValue(state, ins);
       });
     });
     state.cards = state.cards.filter(function (ins) { return !removeUids[ins.uid]; });
@@ -550,7 +552,7 @@ if (typeof window!=="undefined") window.PORTRAITS = PORTRAITS;
   var API = { CARDS: CARDS, PACKS: PACKS, BASE_PRICE: BASE_PRICE, SS_PITY: SS_PITY,
     instanceByUid: instanceByUid, clearRefs: clearRefs,
     newState: newState, openPack: openPack, claimGift: claimGift, claimFreePack: claimFreePack,
-    sellCard: sellCard, sellDuplicates: sellDuplicates, sellValue: sellValue, cardOf: cardOf, litCount: litCount };
+    sellCard: sellCard, sellDuplicates: sellDuplicates, sellValue: sellValue, sellRate: sellRate, cardOf: cardOf, litCount: litCount };
   if (typeof module !== 'undefined') module.exports = API;
   global.LT = API;
 })(typeof window !== 'undefined' ? window : globalThis);
@@ -879,7 +881,7 @@ if (typeof window!=="undefined") window.PORTRAITS = PORTRAITS;
     var reward = { gold: 0, pack: null, promoted: false };
     if (r.win) {
       state.stats.wins += 1; state.streak += 1; state.stars += 1;
-      reward.gold = 50 + 30 * state.division; state.gold += reward.gold;
+      reward.gold = 40 + 25 * state.division; state.gold += reward.gold;
       if (state.stars >= 3 && state.division < 5) { state.division += 1; state.stars = 0; reward.promoted = true; }
       if (state.streak === 3) { var pr = E.openPack(state, 'normal', rng, { free: true }); if (pr.ok) reward.pack = '普通包×1(连胜3场)'; }
     } else state.streak = 0;
@@ -897,7 +899,7 @@ if (typeof window!=="undefined") window.PORTRAITS = PORTRAITS;
     return '今晚手感冰凉,' + (m ? '对面 ' + m + ' 拿了 MVP,' : '') + '下一场把场子找回来。';
   }
   function dailyReset(state, dayStr) {
-    if (state.matchDay !== dayStr) { state.matchDay = dayStr; state.matchesLeft = 5; state.idleAdUsed = 0; }
+    if (state.matchDay !== dayStr) { state.matchDay = dayStr; state.matchesLeft = 20; state.idleAdUsed = 0; }
   }
   function weekKeyOf(d) { // 以周一为界的周键
     var day = new Date(d.getFullYear(), d.getMonth(), d.getDate());
@@ -945,31 +947,31 @@ if (typeof window!=="undefined") window.PORTRAITS = PORTRAITS;
   var COMBO_GROUPS = ['姚麦组合', 'OK组合', '水花兄弟', 'GDP', '热火三巨头', '公牛铁三角', '中国长城'];
 
   var ACHIEVEMENTS = [
-    { id: 'first_ss', name: '天选之人', desc: '首次抽到传世卡(广告体验抽不计)', dia: 3 },
-    { id: 'first_1', name: '万里挑一', desc: '首次抽到 /1 编号卡', dia: 5 },
-    { id: 'dex30', name: '初入江湖', desc: '图鉴点亮 30 张', dia: 3 },
-    { id: 'dex60', name: '半壁江山', desc: '图鉴点亮 60 张', dia: 3 },
-    { id: 'dex90', name: '收藏大家', desc: '图鉴点亮 90 张', dia: 5 },
-    { id: 'dex120', name: '全图鉴', desc: '图鉴点亮全部 120 张', dia: 10 },
-    { id: 'shop5', name: '小有规模', desc: '卡店升到 Lv.5', dia: 3 },
-    { id: 'shop10', name: '卡王门店', desc: '卡店升到 Lv.10', dia: 5 },
-    { id: 'wealth100k', name: '身价十万', desc: '全仓现价市值突破 100,000', dia: 5 },
-    { id: 'wealth500k', name: '身价五十万', desc: '全仓现价市值突破 500,000', dia: 10 },
-    { id: 'master', name: '登峰造极', desc: '联赛升入大师段位', dia: 10 },
-    { id: 'furnace_legend', name: '点石成金', desc: '合成炉合成出传说卡', dia: 5 },
-    { id: 'combo_first', name: '梦之队', desc: '集齐任意一组经典组合', dia: 3 },
-    { id: 'combo_win', name: '名局', desc: '带组合加成的阵容赢下一场联赛', dia: 5 },
-    { id: 'wall', name: '移动长城', desc: '集齐中国长城(姚明/易建联/王治郅)', dia: 3 }
+    { id: 'first_ss', name: '天选之人', desc: '首次抽到传世卡(广告体验抽不计)', dia: 3, gold: 500 },
+    { id: 'first_1', name: '万里挑一', desc: '首次抽到 /1 编号卡', dia: 5, gold: 1000 },
+    { id: 'dex30', name: '初入江湖', desc: '图鉴点亮 30 张', dia: 3, gold: 300 },
+    { id: 'dex60', name: '半壁江山', desc: '图鉴点亮 60 张', dia: 3, gold: 600 },
+    { id: 'dex90', name: '收藏大家', desc: '图鉴点亮 90 张', dia: 5, gold: 1200 },
+    { id: 'dex120', name: '全图鉴', desc: '图鉴点亮全部 120 张', dia: 10, gold: 3000 },
+    { id: 'shop5', name: '小有规模', desc: '卡店升到 Lv.5', dia: 3, gold: 500 },
+    { id: 'shop10', name: '卡王门店', desc: '卡店升到 Lv.10', dia: 5, gold: 1500 },
+    { id: 'wealth100k', name: '身价十万', desc: '全仓现价市值突破 100,000', dia: 5, gold: 800 },
+    { id: 'wealth500k', name: '身价五十万', desc: '全仓现价市值突破 500,000', dia: 10, gold: 2000 },
+    { id: 'master', name: '登峰造极', desc: '联赛升入大师段位', dia: 10, gold: 1500 },
+    { id: 'furnace_legend', name: '点石成金', desc: '合成炉合成出传说卡', dia: 5, gold: 800 },
+    { id: 'combo_first', name: '梦之队', desc: '集齐任意一组经典组合', dia: 3, gold: 400 },
+    { id: 'combo_win', name: '名局', desc: '带组合加成的阵容赢下一场联赛', dia: 5, gold: 600 },
+    { id: 'wall', name: '移动长城', desc: '集齐中国长城(姚明/易建联/王治郅)', dia: 3, gold: 500 }
   ];
   var DAILY_TASKS = [
-    { id: 'pack', name: '开 1 包卡', need: 1, gold: 70, dia: 0 },
-    { id: 'match', name: '打 1 场联赛', need: 1, gold: 70, dia: 0 },
-    { id: 'idle', name: '领取 1 次挂机收益', need: 1, gold: 60, dia: 3 }
+    { id: 'pack', name: '开 1 包卡', need: 1, gold: 135, dia: 0 },
+    { id: 'match', name: '打 1 场联赛', need: 1, gold: 135, dia: 0 },
+    { id: 'idle', name: '领取 1 次挂机收益', need: 1, gold: 130, dia: 3 }
   ]; // 合计 200 金 + 3 钻(规格 §10)
   var WEEKLY_TASKS = [
-    { id: 'furnace', name: '合成 1 次', need: 1, dia: 6 },
-    { id: 'win', name: '赢下 5 场联赛', need: 5, dia: 7 },
-    { id: 'lit', name: '图鉴新增点亮 5 张', need: 5, dia: 7 }
+    { id: 'furnace', name: '合成 1 次', need: 1, dia: 9 },
+    { id: 'win', name: '赢下 5 场联赛', need: 5, dia: 10 },
+    { id: 'lit', name: '图鉴新增点亮 5 张', need: 5, dia: 11 }
   ]; // 合计 20 钻
 
   function litSet(state) { var s = {}; state.cards.forEach(function (i) { s[CARDS[i.cardId].name] = 1; }); return s; }
@@ -1030,7 +1032,7 @@ if (typeof window!=="undefined") window.PORTRAITS = PORTRAITS;
       wall: combos.some(function (g) { return g.done && g.name === '中国长城'; })
     };
     ACHIEVEMENTS.forEach(function (a) {
-      if (!m.ach[a.id] && cond[a.id]) { m.ach[a.id] = true; state.dia += a.dia; unlocked.push(a); }
+      if (!m.ach[a.id] && cond[a.id]) { m.ach[a.id] = true; state.dia += a.dia; state.gold += a.gold || 0; unlocked.push(a); }
     });
     return unlocked;
   }
@@ -1054,7 +1056,7 @@ if (typeof window!=="undefined") window.PORTRAITS = PORTRAITS;
     if (m.signin.lastDay === day) return { ok: false, err: '今日已签到' };
     m.signin.streak = (m.signin.lastDay === yesterday) ? m.signin.streak + 1 : 1;
     m.signin.lastDay = day;
-    var gold = 150, dia = (m.signin.streak % 7 === 0) ? 10 : 0;
+    var gold = 300, dia = (m.signin.streak % 7 === 0) ? 10 : 0;
     state.gold += gold; state.dia += dia;
     return { ok: true, gold: gold, dia: dia, streak: m.signin.streak };
   }
@@ -1102,12 +1104,12 @@ if (typeof window!=="undefined") window.PORTRAITS = PORTRAITS;
   var E = root.LT || (typeof require !== 'undefined' ? require('./engine.js') : null);
   var POINTS = {
     free:   { name: '免费包加领', cap: 1 },
-    idle:   { name: '挂机双倍', cap: 2 },
-    dia:    { name: '钻石小包 +5', cap: 1 },
-    league: { name: '联赛 +3 场', cap: 1 },
+    idle:   { name: '挂机双倍', cap: 3 },
+    dia:    { name: '钻石小包 +10', cap: 2 },
+    league: { name: '联赛 +10 场', cap: 2 },
     chest:  { name: '传世箱体验抽', cap: 1 }
   };
-  var TOTAL_CAP = 6; // 自律上限(规格 §11),非平台口径
+  var TOTAL_CAP = 12; // 自律上限(规格 §11),非平台口径
 
   function ensureDay(state, day) {
     if (!state.ads) state.ads = { day: '', counts: {}, total: 0, pending: null };
@@ -1134,8 +1136,8 @@ if (typeof window!=="undefined") window.PORTRAITS = PORTRAITS;
     if (p.token && a.grantedToken === p.token) { a.pending = null; return { ok: false, err: '已发放(幂等拦截)' }; }
     a.grantedToken = p.token || ('legacy-' + p.ts); a.pending = null;
     a.counts[point] = (a.counts[point] || 0) + 1; a.total += 1;
-    if (point === 'dia') { state.dia += 5; return { ok: true, kind: 'dia', dia: 5 }; }
-    if (point === 'league') { state.matchesLeft += 3; return { ok: true, kind: 'league', matches: 3 }; }
+    if (point === 'dia') { state.dia += 10; return { ok: true, kind: 'dia', dia: 10 }; }
+    if (point === 'league') { state.matchesLeft += 10; return { ok: true, kind: 'league', matches: 10 }; }
     if (point === 'idle') return { ok: true, kind: 'idleDouble' }; // 倍率由 UI 在领取时以 mult=2 走 claimIdle
     if (point === 'free') { var r = E.claimFreePack(state, a.day, rng, true); return r.ok ? { ok: true, kind: 'pack', pack: r } : { ok: false, err: r.err }; }
     if (point === 'chest') { var r2 = E.openPack(state, 'chest', rng, { free: true, fromAd: true }); return r2.ok ? { ok: true, kind: 'pack', pack: r2, fromAd: true } : { ok: false, err: r2.err }; }
@@ -1462,7 +1464,7 @@ window.PAGEIMG = {"store": "data:image/webp;base64,UklGRh6IAABXRUJQVlA4IBKIAADQt
   var V2_DEFAULTS = function () {
     return { display: [], lineup: { PG: null, SG: null, SF: null, PF: null, C: null },
       aceUid: null, tactic: '阵地半场', division: 0, stars: 0, streak: 0,
-      matchesLeft: 5, matchDay: '', idleLast: Date.now(), idleAdUsed: 0, idleAdDay: '',
+      matchesLeft: 20, matchDay: '', idleLast: Date.now(), idleAdUsed: 0, idleAdDay: '',
       weekKey: '', weeklyPending: null,
       market: { day: '', factors: {}, hotWeek: '', hot: [] }, commission: null };
   };
@@ -1554,7 +1556,7 @@ window.PAGEIMG = {"store": "data:image/webp;base64,UklGRh6IAABXRUJQVlA4IBKIAADQt
   function wealthNow() { return state.cards.reduce(function (a, ins) { return a + Y.valueNow(state, ins); }, 0); }
   function checkAch() {
     var un = M.checkAch(state, { wealth: wealthNow(), displayRate: Y.hourlyRate(state) });
-    un.forEach(function (a, i) { setTimeout(function () { toast('🏆 成就解锁：' + a.name + '（+' + a.dia + ' 钻）'); }, i * 2600); });
+    un.forEach(function (a, i) { setTimeout(function () { toast('🏆 成就解锁：' + a.name + '（+' + (a.gold || 0) + ' 金 +' + a.dia + ' 钻）'); }, i * 2600); });
     if (un.length) save();
   }
   function noteDraws(r, fromAd) {
@@ -1778,6 +1780,7 @@ window.PAGEIMG = {"store": "data:image/webp;base64,UklGRh6IAABXRUJQVlA4IBKIAADQt
       (state.streak >= 2 ? '<br>🔥 连胜 ' + state.streak + ' 场（3 连胜奖普通包）' : '');
     $('playBtn').disabled = state.matchesLeft <= 0 || !Y.lineupPower(state);
     $('playBtn').textContent = !Y.lineupPower(state) ? '先组齐阵容' : (state.matchesLeft <= 0 ? '今日场次已用完' : '开赛');
+    $('quickBtn').disabled = state.matchesLeft <= 0 || !Y.lineupPower(state);
   }
   function playMatchUI() {
     var r = Y.playMatch(state, Math.random);
@@ -1906,7 +1909,7 @@ window.PAGEIMG = {"store": "data:image/webp;base64,UklGRh6IAABXRUJQVlA4IBKIAADQt
     var ab = $('achBody');
     ab.innerHTML = M.ACHIEVEMENTS.map(function (a) {
       var got = !!m.ach[a.id];
-      return '<div class="qline"><span>' + (got ? '✅ ' : '⬜ ') + a.name + ' <span style="color:var(--dim)">' + a.desc + '</span></span><span>+' + a.dia + ' 钻</span></div>';
+      return '<div class="qline"><span>' + (got ? '✅ ' : '⬜ ') + a.name + ' <span style="color:var(--dim)">' + a.desc + '</span></span><span>+' + (a.gold || 0) + ' 金 +' + a.dia + ' 钻</span></div>';
     }).join('') + '<div style="color:var(--dim);margin-top:6px">纪录：单卡最高身价 ' + m.records.bestCard + ' · 全仓峰值 ' + m.records.peakWealth + ' · 展示柜时薪峰值 ' + m.records.peakDisplayRate + '/h</div>';
     var used = Object.keys(A.POINTS).map(function (k) { return A.POINTS[k].name + ' ' + (state.ads.counts[k] || 0) + '/' + A.POINTS[k].cap; }).join(' · ');
     $('adInfo').textContent = state.ads.locked ? '今日广告奖励已领完（平台返回）' : '今日已用 ' + state.ads.total + '/' + A.TOTAL_CAP + ' 次：' + used + (state.ads.pending ? ' · 有一笔奖励待核对' : '');
@@ -1935,7 +1938,7 @@ window.PAGEIMG = {"store": "data:image/webp;base64,UklGRh6IAABXRUJQVlA4IBKIAADQt
   function applyAdGrant(point, r) {
     if (!r.ok) { toast(r.err); save(); renderAll(); return; }
     if (r.kind === 'idleDouble') { var got = Y.claimIdle(state, Date.now(), 2); if (got > 0) M.note(state, 'idle'); toast('挂机双倍领取 +' + got + ' 金币'); }
-    else if (r.kind === 'dia') toast('广告奖励 +5 钻石');
+    else if (r.kind === 'dia') toast('广告奖励 +10 钻石');
     else if (r.kind === 'league') toast('广告奖励 +3 场联赛');
     else if (r.kind === 'pack') { noteDraws(r.pack, point === 'chest'); showResult(r.pack, litSetSnapshot); }
     save(); renderAll();
@@ -2101,7 +2104,7 @@ window.PAGEIMG = {"store": "data:image/webp;base64,UklGRh6IAABXRUJQVlA4IBKIAADQt
   $('upgradeBtn').onclick = function () { var r = Y.upgrade(state); if (!r.ok) { toast(r.err); return; } save(); renderAll(); toast('卡店升到 Lv.' + r.level + (r.level === 2 ? '：高级包解锁！' : r.level === 3 ? '：合成炉解锁！' : r.level === 4 ? '：传世箱解锁！' : r.level === 5 ? '：名宿包与行情榜解锁！' : '')); };
   $('autoDisplayBtn').onclick = function () { Y.autoDisplay(state); save(); renderAll(); toast('已自动摆最佳'); };
   $('sellDupBtn').onclick = function () {
-    // M2 起卖卡按行情现价(×0.85):逐人处理,保留现价最高一张
+    // 卖卡按行情现价×回收率(首日0.85/次日起0.5):逐人处理,保留现价最高一张
     var byCard = {}; state.cards.forEach(function (ins) { (byCard[ins.cardId] = byCard[ins.cardId] || []).push(ins); });
     var sold = 0, gold = 0, skipped = 0;
     Object.keys(byCard).forEach(function (cid) {
@@ -2140,6 +2143,23 @@ window.PAGEIMG = {"store": "data:image/webp;base64,UklGRh6IAABXRUJQVlA4IBKIAADQt
   };
   $('autoLineupBtn').onclick = function () { Y.autoLineup(state); save(); renderAll(); toast('已自动组队（王牌=最高评分）'); };
   $('playBtn').onclick = playMatchUI;
+  $('quickBtn').onclick = function () {
+    if (!Y.lineupPower(state)) { toast('先组齐阵容'); return; }
+    var w = 0, l = 0, g = 0, played = 0, lastR = null;
+    for (var i = 0; i < 5; i++) {
+      var r = Y.playMatch(state, Math.random);
+      if (!r.ok) break;
+      played++; lastR = r; M.note(state, 'match');
+      if (r.win) { w++; g += r.reward.gold; M.note(state, 'win'); if (r.myPower && r.myPower.comboBonus > 0) M.note(state, 'comboWin'); } else l++;
+    }
+    if (!played) { toast('今日场次已用完'); return; }
+    save(); renderAll();
+    $('matchPack').style.display = 'block';
+    $('matchTitle').textContent = '快速 ×' + played + ' 战报';
+    $('quarterBody').innerHTML = '<div class="qline"><span>战绩</span><span>' + w + ' 胜 ' + l + ' 负</span></div><div class="qline"><span>胜场奖金</span><span>+' + g + ' 金</span></div>' + (lastR ? '<div class="qline"><span>末场比分</span><span>' + lastR.myTotal + ' : ' + lastR.oppTotal + ' vs ' + lastR.opp.name + '</span></div>' : '');
+    $('matchDetail').style.display = 'none';
+    toast('快速 ' + played + ' 场：' + w + ' 胜 ' + l + ' 负');
+  };
   document.querySelectorAll('[data-furnace]').forEach(function (b) {
     b.onclick = function () {
       var r = Y.furnace(state, b.dataset.furnace, Math.random);
@@ -2221,6 +2241,7 @@ window.PAGEIMG = {"store": "data:image/webp;base64,UklGRh6IAABXRUJQVlA4IBKIAADQt
   // 平台初始化(仅虎扑容器内生效,网页环境静默跳过)
   if (P) {
     P.applySafeTop();
+    if (!state.startDay) { state.startDay = dayStr(); save(); }
     if (window.COURTBG) document.documentElement.style.setProperty('--courtbg', 'url(' + window.COURTBG + ')');
     if (window.PAGEIMG) ['store', 'league', 'dex'].forEach(function (k) { var el = $('hero-' + k); if (el) el.style.backgroundImage = 'url(' + window.PAGEIMG[k] + ')'; });
     if (P.inContainer()) {
