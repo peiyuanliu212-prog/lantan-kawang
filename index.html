@@ -1960,19 +1960,33 @@ window.PAGEIMG = {"store": "data:image/webp;base64,UklGRh6IAABXRUJQVlA4IBKIAADQt
       var res = await plat.showAd();
       if (res.outcome === 'rewarded') { applyAdGrant(point, A.grant(state, point, Math.random, dayStr())); }
       else if (res.outcome === 'unavailable') { A.clearPending(state); state.ads.locked = true; save(); renderAll(); toast('今日广告奖励已领完（平台返回）'); }
-      else if (res.outcome === 'not_rewarded') { A.clearPending(state); save(); renderAll(); toast('广告未完整观看'); }
-      else { save(); renderAll(); toast('广告状态待核对，奖励将在确认后补发'); } // unknown:PENDING 保留,下次启动凭余额差量补发
+      else {
+        // not_rewarded/unknown 不凭单次回调定罪(乱世实锤:切回/回收时回调常缺失或字段不符):
+        // 以服务端余额为准——完播余额必 +1,查到增量立即补发;查不到或未增则保留 PENDING,下次启动再核(12h 过期兜底,不会堵死)
+        var b2 = await plat.getBalance();
+        var s2 = (typeof b2 === 'number') ? A.settlePending(state, b2, Math.random) : { settled: false };
+        if (s2.settled) { applyAdGrant(point, s2.result); }
+        else { save(); renderAll(); toast('广告状态待核对，奖励将在确认后补发'); }
+      }
       return;
     }
     A.begin(state, point, null); save();
     $('adModal').classList.add('on');
-    var n = 3; $('adCount').textContent = n;
-    var timer = setInterval(function () {
-      n--;
-      if (n > 0) { $('adCount').textContent = n; return; }
-      clearInterval(timer); $('adModal').classList.remove('on');
+    var t0 = Date.now(), adDone = false;
+    $('adCount').textContent = 3;
+    function adFinish() {
+      if (adDone) return; adDone = true;
+      clearInterval(timer); document.removeEventListener('visibilitychange', adVis);
+      $('adModal').classList.remove('on');
       applyAdGrant(point, A.grant(state, point, Math.random, dayStr()));
-    }, 1000);
+    }
+    function adVis() { if (!document.hidden && Date.now() - t0 >= 3000) adFinish(); }
+    var timer = setInterval(function () {
+      var el = Date.now() - t0;
+      if (el >= 3000) { adFinish(); return; }
+      $('adCount').textContent = 3 - Math.floor(el / 1000);
+    }, 250);
+    document.addEventListener('visibilitychange', adVis);
   }
   function drawShareCard() {
     if (!lastResult) return;
@@ -2261,6 +2275,12 @@ window.PAGEIMG = {"store": "data:image/webp;base64,UklGRh6IAABXRUJQVlA4IBKIAADQt
           if (s.settled) { toast('广告奖励已补发'); if (s.result && s.result.kind === 'pack') showResult(s.result.pack, litSet()); save(); renderAll(); }
         });
       }
+    }
+    if (!P.inContainer() && state.ads.pending) {
+      // 网页/试玩站:模拟广告无平台可核对,页面被回收时 PENDING 无人补发会永久丢失——启动直接补发(仅非容器环境)
+      var pPoint = state.ads.pending.point;
+      var r0 = A.grant(state, pPoint, Math.random, dayStr());
+      if (r0.ok) { applyAdGrant(pPoint, r0); toast('广告奖励已补发'); }
     }
   }
 })();
