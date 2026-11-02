@@ -230,7 +230,7 @@ nav.tabs button.on .ti{filter:none;opacity:1}
 <main>
   <section class="page on" id="page-store">
     <div class="pagehero" id="hero-store"></div>
-    <div class="tip"><b>怎么攒金币：</b>①展示柜挂机放好卡自动生金币（离线封顶 8 小时）；②<b>卖重复卡</b>回血（保留每人最贵一张）；③收藏家委托每日高价收指定卡。金币开包、钻石开传世箱/名宿包。</div>
+    <div class="tip"><b>怎么攒金币：</b>①展示柜挂机放好卡自动生金币（离线封顶 8 小时）；②<b>卖重复卡</b>回血（开业首日 85%、次日起 50% 回收，保留每人最贵一张）；③收藏家委托每日高价收指定卡。<br><b>钻石花哪：</b>只开传世箱（40 钻）和名宿包（30 钻，Lv.5 解锁），点顶部钻石数字可直达开包页；钻石来源：每日任务 3 · 每周任务 30 · 成就 · 签到连签 7 天 +10 · 看广告 +10。</div>
     <div class="pack"><h3>🏪 我的卡店 <span id="storeLevel" style="font-size:13px;color:var(--accent)"></span></h3>
       <div id="idleInfo" style="margin:10px 0;font-size:14px"></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap"><button id="claimIdleBtn">领取挂机收益</button><button id="upgradeBtn" class="ghost"></button></div>
@@ -245,7 +245,7 @@ nav.tabs button.on .ti{filter:none;opacity:1}
       <div style="margin-top:10px"><button id="claimWeeklyBtn">领取周结算</button></div>
     </div>
     <div class="pack"><h3>📅 签到与任务</h3>
-      <div style="margin-top:8px;display:flex;gap:8px;align-items:center"><button id="signinBtn">每日签到 +150 金币</button><span id="signinInfo" style="font-size:13px;color:var(--dim)"></span></div>
+      <div style="margin-top:8px;display:flex;gap:8px;align-items:center"><button id="signinBtn">每日签到 +300 金币</button><span id="signinInfo" style="font-size:13px;color:var(--dim)"></span></div>
       <div id="taskBody" style="margin-top:10px;font-size:13.5px"></div>
     </div>
     <div class="pack"><h3>🎁 每日福利（广告纯自愿，不看广告可完整游玩）</h3>
@@ -266,6 +266,7 @@ nav.tabs button.on .ti{filter:none;opacity:1}
   <section class="page" id="page-shop">
     <div style="margin-bottom:12px"><button id="freeBtn" style="width:100%">领取今日免费包</button>
     <button id="adFreeBtn" class="ghost" style="width:100%;margin-top:8px">📺 看广告再领一包（每日 1 次）</button></div>
+    <p class="hint" style="font-size:12.5px;color:var(--dim);margin:2px 2px 10px">钻石花哪：只开传世箱（40 钻）与名宿包（30 钻，卡店 Lv.5 解锁）。钻石来源：每日任务、每周任务、成就、连签 7 天 +10、看广告 +10。</p>
     <div id="packList"></div>
   </section>
 
@@ -897,7 +898,7 @@ if (typeof window!=="undefined") window.PORTRAITS = PORTRAITS;
       state.stats.wins += 1; state.streak += 1; state.stars += 1;
       reward.gold = 40 + 25 * state.division; state.gold += reward.gold;
       if (state.stars >= 3 && state.division < 5) { state.division += 1; state.stars = 0; reward.promoted = true; }
-      if (state.streak === 3) { var pr = E.openPack(state, 'normal', rng, { free: true }); if (pr.ok) reward.pack = '普通包×1(连胜3场)'; }
+      if (state.streak === 3) { var pr = E.openPack(state, 'normal', rng, { free: true }); if (pr.ok) { reward.pack = '普通包×1（连胜3场）'; reward.packCards = pr; } }
     } else state.streak = 0;
     r.ok = true; r.myPower = pw; r.opp = opp; r.reward = reward;
     r.report = buildReport(r.win, r.upset, r.margin, r.mvp, pw, state);
@@ -1637,7 +1638,7 @@ window.PAGEIMG = {"store": "data:image/webp;base64,UklGRh6IAABXRUJQVlA4IBKIAADQt
   function litSet() { var s = {}; state.cards.forEach(function (i) { s[i.cardId] = 1; }); return s; }
 
   function renderTop() {
-    $('resLine').innerHTML = (nickname ? '<span class="cur">👤 ' + esc(nickname) + '</span> ' : '') + '<span class="cur">🪙 <b>' + state.gold + '</b></span> <span class="cur">💎 <b>' + state.dia + '</b></span> <span class="cur dim2">图鉴 <b>' + E.litCount(state) + '</b>/120</span>' + (state.title ? ' <span class="cur crown">👑 ' + esc(state.title) + '</span>' : '');
+    $('resLine').innerHTML = (nickname ? '<span class="cur">👤 ' + esc(nickname) + '</span> ' : '') + '<span class="cur">🪙 <b>' + state.gold + '</b></span> <span class="cur" id="diaPill" title="钻石用于开传世箱与名宿包，点我直达" style="cursor:pointer">💎 <b>' + state.dia + '</b></span> <span class="cur dim2">图鉴 <b>' + E.litCount(state) + '</b>/120</span>' + (state.title ? ' <span class="cur crown">👑 ' + esc(state.title) + '</span>' : '');
     $('ownerBadge').textContent = '🏪 卡店店主 Lv.' + state.level;
     $('pityFill').style.width = (state.pity.ss / E.SS_PITY * 100) + '%';
     $('pityText').textContent = '传世保底 ' + state.pity.ss + '/' + E.SS_PITY;
@@ -1838,6 +1839,7 @@ window.PAGEIMG = {"store": "data:image/webp;base64,UklGRh6IAABXRUJQVlA4IBKIAADQt
     $('quickBtn').disabled = state.matchesLeft <= 0 || !Y.lineupPower(state);
   }
   function playMatchUI() {
+    var beforeLit = litSet();
     var r = Y.playMatch(state, Math.random);
     if (!r.ok) { toast(r.err); return; }
     M.note(state, 'match');
@@ -1863,6 +1865,7 @@ window.PAGEIMG = {"store": "data:image/webp;base64,UklGRh6IAABXRUJQVlA4IBKIAADQt
           (r.reward.gold ? '奖励：+' + r.reward.gold + ' 金币' : '') + (r.reward.pack ? ' · ' + r.reward.pack : '') + (r.reward.promoted ? ' · ⬆️ 升段到 ' + Y.DIVISIONS[state.division].name + '！' : '');
         $('matchDetail').style.display = 'block';
         renderAll();
+        if (r.reward.packCards) { noteDraws({ instances: r.reward.packCards.instances }, false); showResult(r.reward.packCards, beforeLit); toast('连胜奖励包已开出（3 连胜）！'); }
       }
     }, 420);
   }
@@ -1946,7 +1949,7 @@ window.PAGEIMG = {"store": "data:image/webp;base64,UklGRh6IAABXRUJQVlA4IBKIAADQt
   function renderMeta() {
     var m = state.meta;
     $('signinBtn').disabled = m.signin.lastDay === dayStr();
-    $('signinBtn').textContent = m.signin.lastDay === dayStr() ? '今日已签到' : '每日签到 +150 金币';
+    $('signinBtn').textContent = m.signin.lastDay === dayStr() ? '今日已签到' : '每日签到 +300 金币';
     $('signinInfo').textContent = '连签 ' + m.signin.streak + ' 天（每 7 天 +10 钻）';
     var tb = $('taskBody'); tb.innerHTML = '<div style="color:var(--dim);margin-bottom:4px">每日任务（合计 200 金 + 3 钻）</div>';
     M.DAILY_TASKS.forEach(function (t) {
@@ -2214,12 +2217,12 @@ window.PAGEIMG = {"store": "data:image/webp;base64,UklGRh6IAABXRUJQVlA4IBKIAADQt
   $('playBtn').onclick = playMatchUI;
   $('quickBtn').onclick = function () {
     if (!Y.lineupPower(state)) { toast('先组齐阵容'); return; }
-    var w = 0, l = 0, g = 0, played = 0, lastR = null;
+    var w = 0, l = 0, g = 0, played = 0, lastR = null, qPacks = [], qBefore = litSet();
     for (var i = 0; i < 5; i++) {
       var r = Y.playMatch(state, Math.random);
       if (!r.ok) break;
       played++; lastR = r; M.note(state, 'match');
-      if (r.win) { w++; g += r.reward.gold; M.note(state, 'win'); if (r.myPower && r.myPower.comboBonus > 0) M.note(state, 'comboWin'); } else l++;
+      if (r.win) { w++; g += r.reward.gold; if (r.reward.packCards) qPacks.push(r.reward.packCards); M.note(state, 'win'); if (r.myPower && r.myPower.comboBonus > 0) M.note(state, 'comboWin'); } else l++;
     }
     if (!played) { toast('今日场次已用完'); return; }
     save(); renderAll();
@@ -2228,6 +2231,13 @@ window.PAGEIMG = {"store": "data:image/webp;base64,UklGRh6IAABXRUJQVlA4IBKIAADQt
     $('quarterBody').innerHTML = '<div class="qline"><span>战绩</span><span>' + w + ' 胜 ' + l + ' 负</span></div><div class="qline"><span>胜场奖金</span><span>+' + g + ' 金</span></div>' + (lastR ? '<div class="qline"><span>末场比分</span><span>' + lastR.myTotal + ' : ' + lastR.oppTotal + ' vs ' + lastR.opp.name + '</span></div>' : '');
     $('matchDetail').style.display = 'none';
     toast('快速 ' + played + ' 场：' + w + ' 胜 ' + l + ' 负');
+    if (qPacks.length) {
+      var mc = [], mi = [];
+      qPacks.forEach(function (p) { p.cards.forEach(function (c) { mc.push(c); }); p.instances.forEach(function (x) { mi.push(x); }); });
+      noteDraws({ instances: mi }, false);
+      showResult({ cards: mc, instances: mi }, qBefore);
+      toast('连胜奖励包 x' + qPacks.length + ' 已开出！');
+    }
   };
   document.querySelectorAll('[data-furnace]').forEach(function (b) {
     b.onclick = function () {
@@ -2309,6 +2319,7 @@ window.PAGEIMG = {"store": "data:image/webp;base64,UklGRh6IAABXRUJQVlA4IBKIAADQt
     renderAll();
     if (!state.giftClaimed) claimGiftFlow();
   }
+  $('resLine').addEventListener('click', function (e) { var p = e.target.closest('#diaPill'); if (p) { var b = document.querySelector('nav.tabs button[data-page="shop"]'); if (b) b.click(); } });
   $('slotList').addEventListener('click', function (e) {
     var b = e.target.closest('button'); if (!b) return;
     if (b.dataset.enter) enterSlot(+b.dataset.enter);
