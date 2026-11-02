@@ -899,7 +899,7 @@ if (typeof window!=="undefined") window.PORTRAITS = PORTRAITS;
     return '今晚手感冰凉,' + (m ? '对面 ' + m + ' 拿了 MVP,' : '') + '下一场把场子找回来。';
   }
   function dailyReset(state, dayStr) {
-    if (state.matchDay !== dayStr) { state.matchDay = dayStr; state.matchesLeft = 20; state.idleAdUsed = 0; }
+    if (state.matchDay !== dayStr) { state.matchDay = dayStr; state.matchesLeft = 20; state.idleAdUsed = 0; state.leagueBoostV2 = true; }
     else if (!state.leagueBoostV2) { // 对标迁移:旧版同日已按5场基数开局的老档,一次性补齐免费基数差额+15(封顶40),仅执行一次
       state.matchesLeft = Math.min(40, state.matchesLeft + 15); state.leagueBoostV2 = true;
     }
@@ -1779,7 +1779,7 @@ window.PAGEIMG = {"store": "data:image/webp;base64,UklGRh6IAABXRUJQVlA4IBKIAADQt
   function renderLeague() {
     var dv = Y.DIVISIONS[state.division];
     $('leagueInfo').innerHTML = '当前段位：<b style="color:var(--gold)">' + dv.name + '</b>（目标线 ' + dv.line + '）· 星 ' + state.stars + '/3' +
-      '<br>今日剩余场次：<b>' + state.matchesLeft + '</b> / 5 · 战绩 ' + state.stats.wins + ' 胜 / ' + state.stats.matches + ' 场' +
+      '<br>今日剩余场次：<b>' + state.matchesLeft + '</b> / 20 · 战绩 ' + state.stats.wins + ' 胜 / ' + state.stats.matches + ' 场' +
       (state.streak >= 2 ? '<br>🔥 连胜 ' + state.streak + ' 场（3 连胜奖普通包）' : '');
     $('playBtn').disabled = state.matchesLeft <= 0 || !Y.lineupPower(state);
     $('playBtn').textContent = !Y.lineupPower(state) ? '先组齐阵容' : (state.matchesLeft <= 0 ? '今日场次已用完' : '开赛');
