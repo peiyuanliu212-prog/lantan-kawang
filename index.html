@@ -1953,7 +1953,6 @@ window.PACKIMG = {"normal": "data:image/webp;base64,UklGRrhoAABXRUJQVlA4IKxoAADw
   function drawShareCard() {
     if (!lastResult) return;
     var rarColor = { '普通': '#9aa5b1', '稀有': '#4da3ff', '史诗': '#b07dff', '传说': '#ffb84d', '传世': '#ffe14d' };
-    // 本包最佳卡作主视觉(同档取身价高者)
     var bi = 0;
     lastResult.cards.forEach(function (c, ix) {
       var a = lastResult.cards[bi], ia = lastResult.instances[bi], ic = lastResult.instances[ix];
@@ -1961,52 +1960,106 @@ window.PACKIMG = {"normal": "data:image/webp;base64,UklGRrhoAABXRUJQVlA4IKxoAADw
     });
     var best = lastResult.cards[bi], bins = lastResult.instances[bi];
     var src = window.PORTRAITS && window.PORTRAITS[best.id + 1];
+    function rr(ctx, x, y, w, h, r) { ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(x, y, w, h, r); else ctx.rect(x, y, w, h); }
+    function ball(ctx, cx, cy, R, alpha) {
+      ctx.save(); ctx.globalAlpha = alpha;
+      var g = ctx.createRadialGradient(cx - R * .35, cy - R * .35, R * .15, cx, cy, R);
+      g.addColorStop(0, '#c97a2e'); g.addColorStop(1, '#6e3c10');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, R, 0, 7); ctx.fill();
+      ctx.strokeStyle = 'rgba(30,16,4,.85)'; ctx.lineWidth = R * .045;
+      ctx.beginPath(); ctx.arc(cx, cy, R, 0, 7); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(cx - R, cy); ctx.lineTo(cx + R, cy); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(cx, cy - R); ctx.lineTo(cx, cy + R); ctx.stroke();
+      ctx.beginPath(); ctx.arc(cx - R * 1.25, cy, R * .95, -0.85, 0.85); ctx.stroke();
+      ctx.beginPath(); ctx.arc(cx + R * 1.25, cy, R * .95, Math.PI - 0.85, Math.PI + 0.85); ctx.stroke();
+      ctx.restore();
+    }
     function paint(img) {
       var cv = $('shareCanvas'), ctx = cv.getContext('2d');
-      var grad = ctx.createLinearGradient(0, 0, 0, 1000); grad.addColorStop(0, '#16224a'); grad.addColorStop(1, '#0a0f22');
+      // 背景:深蓝球馆+顶部聚光+右上与右侧大篮球+底部金光轨
+      var grad = ctx.createLinearGradient(0, 0, 0, 1000); grad.addColorStop(0, '#131f42'); grad.addColorStop(1, '#070b1c');
       ctx.fillStyle = grad; ctx.fillRect(0, 0, 750, 1000);
-      ctx.fillStyle = '#ffd94d'; ctx.font = '900 62px sans-serif'; ctx.textAlign = 'center';
-      ctx.fillText('篮坛卡王', 375, 104);
-      ctx.fillStyle = '#aebadd'; ctx.font = '27px sans-serif';
-      ctx.fillText('开包抽乔丹 · 追 1/1 当卡王', 375, 150);
-      ctx.fillStyle = 'rgba(255,217,77,.5)'; ctx.fillRect(90, 178, 570, 2);
-      // 主卡区:左肖像 288x384,右信息
-      ctx.save();
-      ctx.beginPath();
-      if (ctx.roundRect) ctx.roundRect(56, 214, 288, 384, 14); else ctx.rect(56, 214, 288, 384);
-      ctx.clip();
-      if (img) ctx.drawImage(img, 56, 214, 288, 384);
-      else { ctx.fillStyle = '#22315f'; ctx.fillRect(56, 214, 288, 384); ctx.fillStyle = '#8fa0c8'; ctx.font = '900 110px sans-serif'; ctx.fillText(best.en ? best.en.slice(0, 2).toUpperCase() : '?', 200, 440); }
+      var spot = ctx.createRadialGradient(375, -60, 40, 375, -60, 560);
+      spot.addColorStop(0, 'rgba(255,196,86,.34)'); spot.addColorStop(1, 'rgba(255,196,86,0)');
+      ctx.fillStyle = spot; ctx.fillRect(0, 0, 750, 700);
+      ball(ctx, 668, 74, 92, .5);
+      ball(ctx, 706, 430, 128, .34);
+      var track = ctx.createLinearGradient(0, 760, 750, 1000);
+      track.addColorStop(0, 'rgba(255,170,40,0)'); track.addColorStop(.75, 'rgba(255,170,40,.16)'); track.addColorStop(1, 'rgba(255,170,40,.30)');
+      ctx.fillStyle = track; ctx.fillRect(0, 700, 750, 300);
+      // 标题牌:晒单卡
+      ctx.save(); ctx.translate(375, 66);
+      var tg = ctx.createLinearGradient(0, -38, 0, 38); tg.addColorStop(0, '#3a2a08'); tg.addColorStop(.5, '#171106'); tg.addColorStop(1, '#2c2008');
+      ctx.fillStyle = tg; ctx.beginPath();
+      ctx.moveTo(-188, -30); ctx.lineTo(188, -30); ctx.lineTo(152, 34); ctx.lineTo(-152, 34); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = '#e8b23a'; ctx.lineWidth = 2.5; ctx.stroke();
+      var gold = ctx.createLinearGradient(0, -30, 0, 34); gold.addColorStop(0, '#fff0b3'); gold.addColorStop(.55, '#f5c542'); gold.addColorStop(1, '#b97e10');
+      ctx.fillStyle = gold; ctx.font = '900 47px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText('晒 单 卡', 0, 20);
+      ctx.fillStyle = '#c9a44e'; ctx.font = '700 16px sans-serif';
+      ctx.fillText('B A S K E T B A L L   C A R D', 0, 56);
       ctx.restore();
-      ctx.strokeStyle = rarColor[best.rar]; ctx.lineWidth = 4;
-      ctx.beginPath();
-      if (ctx.roundRect) ctx.roundRect(56, 214, 288, 384, 14); else ctx.rect(56, 214, 288, 384);
-      ctx.stroke();
+      ctx.font = '30px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(best.rar === '传世' ? '👑' : '', 375, 40);
+      // 主卡:完整卡框(左)
+      var X = 44, Y = 168, W = 296, H = 412, rc = rarColor[best.rar];
+      ctx.save();
+      rr(ctx, X - 5, Y - 5, W + 10, H + 10, 20); ctx.fillStyle = '#0d1430'; ctx.fill();
+      ctx.strokeStyle = rc; ctx.lineWidth = 4; ctx.stroke();
+      rr(ctx, X, Y, W, H, 16); ctx.clip();
+      if (img) ctx.drawImage(img, X, Y, W, H);
+      else { ctx.fillStyle = '#22315f'; ctx.fillRect(X, Y, W, H); ctx.fillStyle = '#8fa0c8'; ctx.font = '900 104px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(best.en ? best.en.slice(0, 2).toUpperCase() : '?', X + W / 2, Y + 236); }
+      var fade = ctx.createLinearGradient(0, Y + H - 96, 0, Y + H);
+      fade.addColorStop(0, 'rgba(4,6,16,0)'); fade.addColorStop(1, 'rgba(4,6,16,.88)');
+      ctx.fillStyle = fade; ctx.fillRect(X, Y + H - 96, W, 96);
+      ctx.fillStyle = '#fff'; ctx.font = '800 31px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText(best.name.split('·').pop(), X + W / 2, Y + H - 24);
+      ctx.restore();
+      // 左上角标:稀有度牌
+      ctx.save();
+      rr(ctx, X + 10, Y + 12, 108, 44, 9); ctx.fillStyle = 'rgba(8,10,24,.88)'; ctx.fill();
+      ctx.strokeStyle = rc; ctx.lineWidth = 2; ctx.stroke();
+      ctx.fillStyle = rc; ctx.font = '900 26px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText(best.rar, X + 64, Y + 43);
+      ctx.restore();
+      // 右上评分
+      ctx.fillStyle = '#fff'; ctx.font = '900 58px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText(String(best.rating), X + W - 42, Y + 58);
+      ctx.font = '800 24px sans-serif'; ctx.fillText(best.pos, X + W - 42, Y + 88);
+      // 右侧信息
       ctx.textAlign = 'left';
-      ctx.fillStyle = rarColor[best.rar]; ctx.font = '900 46px sans-serif';
-      ctx.fillText(best.name, 376, 292);
-      ctx.fillStyle = '#dfe6ff'; ctx.font = '30px sans-serif';
-      ctx.fillText(best.pos + ' · ' + best.rar + ' ' + best.rating, 376, 344);
-      ctx.fillText(bins.num + (bins.par !== 'base' ? ' · ' + bins.par : ''), 376, 392);
-      ctx.fillStyle = '#8fa0c8'; ctx.font = '26px sans-serif';
-      ctx.fillText('身价', 376, 472);
-      ctx.fillStyle = '#ffd94d'; ctx.font = '900 64px sans-serif';
-      ctx.fillText(String(bins.value), 376, 540);
-      // 其余卡列表
-      var y = 648;
-      lastResult.cards.forEach(function (card, ix) {
-        if (ix === bi) return;
-        var ins = lastResult.instances[ix];
-        ctx.fillStyle = 'rgba(255,255,255,0.06)'; ctx.fillRect(56, y, 638, 62);
-        ctx.fillStyle = rarColor[card.rar]; ctx.font = '700 28px sans-serif'; ctx.textAlign = 'left';
-        ctx.fillText(card.name, 78, y + 40);
-        ctx.fillStyle = '#c6cfee'; ctx.font = '24px sans-serif'; ctx.textAlign = 'right';
-        ctx.fillText(card.pos + ' · ' + card.rar + ' ' + card.rating + ' · ' + ins.num + ' · 身价 ' + ins.value, 672, y + 40);
-        ctx.textAlign = 'left';
-        y += 72;
-      });
-      ctx.textAlign = 'center'; ctx.fillStyle = '#8fa0c8'; ctx.font = '24px sans-serif';
-      ctx.fillText((state.title ? '👑 卡王 · ' : '') + '图鉴 ' + E.litCount(state) + '/120 · ' + dayStr().replace(/-(\d)(?=-|$)/g, '-0$1'), 375, 956);
+      ctx.fillStyle = rc; ctx.font = '900 43px sans-serif';
+      ctx.fillText(best.name, 372, 240);
+      ctx.fillStyle = '#e7ecff'; ctx.font = '29px sans-serif';
+      ctx.fillText(best.pos + ' · ' + best.rar + ' ' + best.rating, 372, 292);
+      ctx.fillText(bins.num + (bins.par !== 'base' ? ' · ' + bins.par : ''), 372, 338);
+      rr(ctx, 372, 386, 92, 40, 8); ctx.fillStyle = '#241a05'; ctx.fill();
+      ctx.strokeStyle = '#e8b23a'; ctx.lineWidth = 1.6; ctx.stroke();
+      ctx.fillStyle = '#f5c542'; ctx.font = '800 25px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText('身价', 418, 414);
+      var vg = ctx.createLinearGradient(0, 448, 0, 522); vg.addColorStop(0, '#fff0b3'); vg.addColorStop(.55, '#f5c542'); vg.addColorStop(1, '#c07f0e');
+      ctx.fillStyle = vg; ctx.font = '900 74px sans-serif'; ctx.textAlign = 'left';
+      ctx.fillText(String(bins.value), 372, 518);
+      var tw = ctx.measureText(String(bins.value)).width;
+      ball(ctx, 372 + tw + 42, 486, 27, .95);
+      // 其余卡列表面板
+      var others = lastResult.cards.length - 1;
+      if (others > 0) {
+        rr(ctx, 44, 616, 662, others * 66 + 22, 14);
+        ctx.fillStyle = 'rgba(13,20,46,.82)'; ctx.fill();
+        ctx.strokeStyle = 'rgba(120,140,210,.35)'; ctx.lineWidth = 1.5; ctx.stroke();
+        var y = 640;
+        lastResult.cards.forEach(function (card, ix) {
+          if (ix === bi) return;
+          var ins = lastResult.instances[ix];
+          ctx.fillStyle = rarColor[card.rar]; ctx.font = '700 27px sans-serif'; ctx.textAlign = 'left';
+          ctx.fillText(card.name, 70, y + 34);
+          ctx.fillStyle = '#c6cfee'; ctx.font = '24px sans-serif'; ctx.textAlign = 'right';
+          ctx.fillText(card.pos + ' · ' + card.rar + ' ' + card.rating + ' · ' + ins.num + ' · 身价 ' + ins.value, 680, y + 34);
+          y += 66;
+        });
+      }
+      ctx.textAlign = 'center'; ctx.fillStyle = '#aebadd'; ctx.font = '24px sans-serif';
+      ctx.fillText((state.title ? '👑 卡王 · ' : '') + '图鉴 ' + E.litCount(state) + '/120 · ' + dayStr().replace(/-(\d)(?=-|$)/g, '-0$1'), 375, 972);
       $('shareModal').classList.add('on');
     }
     if (src) { var im = new Image(); im.onload = function () { paint(im); }; im.onerror = function () { paint(null); }; im.src = src; }
