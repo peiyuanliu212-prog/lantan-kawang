@@ -900,6 +900,9 @@ if (typeof window!=="undefined") window.PORTRAITS = PORTRAITS;
   }
   function dailyReset(state, dayStr) {
     if (state.matchDay !== dayStr) { state.matchDay = dayStr; state.matchesLeft = 20; state.idleAdUsed = 0; }
+    else if (!state.leagueBoostV2) { // 对标迁移:旧版同日已按5场基数开局的老档,一次性补齐免费基数差额+15(封顶40),仅执行一次
+      state.matchesLeft = Math.min(40, state.matchesLeft + 15); state.leagueBoostV2 = true;
+    }
   }
   function weekKeyOf(d) { // 以周一为界的周键
     var day = new Date(d.getFullYear(), d.getMonth(), d.getDate());
