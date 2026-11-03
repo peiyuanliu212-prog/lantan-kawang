@@ -583,9 +583,11 @@ if (typeof window!=="undefined") window.PORTRAITS = PORTRAITS;
   }
   function ratingAdj(rating) { return 0.9 + (rating - 70) / 27 * 0.18; }
   // 金币包分层（大改版决策 3 后半）：金币包出卡限编只出 无编//99、版本只出 普卡/银折；
-  // 用过滤后的表 roll（概率在表内归一），钻石包/名宿包/合成/礼包路径走全表、概率零影响。
-  var NUM_ROLL_GOLD = [NUM_ROLL[0], NUM_ROLL[1]];
-  var PAR_ROLL_GOLD = [PAR_ROLL[0], PAR_ROLL[1]];
+  // 出率与足坛同口径：/99 保持全表 .18、银折保持全表 .07 不变，被砍档位的概率质量并入底档（无编/base）；
+  // 底档概率由全表两档现算（1-次档率），单一事实源防漂移。钻石包/名宿包/合成/礼包路径走全表、概率零影响。
+  // （补查修复 2026-11-03：旧版直接截断表头两档 roll，rollTable 末项兜底使 /99 实测 .30、银折 .12，超口径近七成——已跑数实证。）
+  var NUM_ROLL_GOLD = [[NUM_ROLL[0][0], 1 - NUM_ROLL[1][1], NUM_ROLL[0][2]], NUM_ROLL[1]];
+  var PAR_ROLL_GOLD = [[PAR_ROLL[0][0], 1 - PAR_ROLL[1][1], PAR_ROLL[0][2]], PAR_ROLL[1]];
   function makeInstance(card, rng, fromAd, goldCtx, src) {
     var num = rollTable(goldCtx ? NUM_ROLL_GOLD : NUM_ROLL, rng), par = rollTable(goldCtx ? PAR_ROLL_GOLD : PAR_ROLL, rng);
     var value = Math.round(BASE_PRICE[card.rar] * ratingAdj(card.rating) * num[2] * par[2]);
@@ -781,7 +783,9 @@ if (typeof window!=="undefined") window.PORTRAITS = PORTRAITS;
   function sellCard(state, uid, priceOverride) {
     var i = state.cards.findIndex(function (c) { return c.uid === uid; });
     if (i < 0) return { ok: false, err: '卡不存在' };
-    var ins = state.cards[i], v = (typeof priceOverride === 'number') ? priceOverride : sellValue(state, ins);
+    var ins = state.cards[i];
+    if (ins.listed) return { ok: false, err: '挂牌中的卡已冻结（先在交易所取消挂牌）' }; // 引擎层兜底（与足坛同口径）：防委托成交等绕过 UI 预检的路径把挂牌卡卖掉成一卡两卖
+    var v = (typeof priceOverride === 'number') ? priceOverride : sellValue(state, ins);
     state.cards.splice(i, 1); state.gold += v;
     clearRefs(state, uid);
     return { ok: true, gold: v };
@@ -1007,6 +1011,7 @@ if (typeof window!=="undefined") window.PORTRAITS = PORTRAITS;
     var used;
     if (uids && uids.length) { // 手动选卡:必须恰好 3 张且都在候选内
       if (uids.length !== 3) return { ok: false, err: '请选择恰好 3 张卡' };
+      if (uids[0] === uids[1] || uids[0] === uids[2] || uids[1] === uids[2]) return { ok: false, err: '不能重复选择同一张卡' }; // 审计修复：重复 uid 会让后续 splice(findIndex=-1,1) 误删末位无关卡（与 starUp 的重复材料拒绝同口径）
       var byUid = {}; cand.forEach(function (ins) { byUid[ins.uid] = ins; });
       used = [];
       for (var ui = 0; ui < uids.length; ui++) { if (!byUid[uids[ui]]) return { ok: false, err: '所选卡不可合成(已不在卡库或正被展示/上场)' }; used.push(byUid[uids[ui]]); }
@@ -1101,6 +1106,7 @@ if (typeof window!=="undefined") window.PORTRAITS = PORTRAITS;
     var used;
     if (uids && uids.length) {
       if (uids.length !== 3) return { ok: false, err: '请选择恰好 3 张卡' };
+      if (uids[0] === uids[1] || uids[0] === uids[2] || uids[1] === uids[2]) return { ok: false, err: '不能重复选择同一张卡' }; // 审计修复：同 furnace，防重复 uid 触发 splice(-1,1) 误删
       var byUid = {}; cand.forEach(function (ins) { byUid[ins.uid] = ins; });
       used = [];
       for (var ui = 0; ui < uids.length; ui++) { if (!byUid[uids[ui]]) return { ok: false, err: '所选卡不可冲档(已不在卡库或正被展示/上场)' }; used.push(byUid[uids[ui]]); }
@@ -1195,6 +1201,7 @@ if (typeof window!=="undefined") window.PORTRAITS = PORTRAITS;
     if (!com || com.none || com.done) return { ok: false, err: '无可接委托' };
     var ins = E.instanceByUid(state, com.uid);
     if (!ins) { com.done = true; return { ok: false, err: '目标卡已不在卡库' }; }
+    if (ins.listed) return { ok: false, err: '这张卡正在交易所挂牌，先取消挂牌再卖委托（防一卡两卖）' }; // 委托生成时虽已排除挂牌卡，生成后玩家仍可把目标卡挂牌——成交前必须复查（与足坛审计修复同口径；引擎 sellCard 另有兜底）
     var inLineup = Object.keys(state.lineup || {}).some(function (k) { return state.lineup[k] === com.uid; });
     var r = E.sellCard(state, com.uid, com.price);
     if (r.ok) { com.done = true; return { ok: true, gold: com.price, wasLineup: inLineup }; }
@@ -1592,12 +1599,17 @@ if (typeof window!=="undefined") window.PORTRAITS = PORTRAITS;
     var gv = { 'PSA 9': 1.9, 'BGS 9.5': 2.6, 'PSA 10': 3.6, 'BGS 10': 6.2, '黑标': 9.5 }[snap.grade] || 1;
     return Math.round(v0 * Math.pow(1.25, snap.star || 0) * gv);
   }
+  var SNAP_GRADE_OK = ['PSA 9', 'BGS 9.5', 'PSA 10', 'BGS 10', '黑标']; // 与 save.js LT2_GRADES 同口径
   function instanceFromSnap(snap, src) {
     var card = CARDS[snap.cardId]; if (!card) return null;
-    var v0 = Math.round(E.BASE_PRICE[card.rar] * E.ratingAdj(card.rating) * (E.NUM_MULT[snap.num] || 1) * (E.PAR_MULT[snap.par || 'base'] || 1));
+    var okNum = snap.num && E.NUM_MULT[snap.num] ? snap.num : '无编'; // 入仓枚举校验（XSS 净化，与足坛同口径）：服务端 snap 的 num/par/grade 若被伪造为任意字符串，回落默认，绝不原样落进本地实例再被各处渲染
+    var okPar = snap.par && E.PAR_MULT[snap.par] ? snap.par : 'base';
+    var okGrade = SNAP_GRADE_OK.indexOf(snap.grade) >= 0 ? snap.grade : null;
+    var okStar = Number.isSafeInteger(snap.star) ? Math.max(0, Math.min(5, snap.star)) : 0; // star 同样入仓夹紧（服务端挂牌复算只认 0–5；伪造大星数不落本地）
+    var v0 = Math.round(E.BASE_PRICE[card.rar] * E.ratingAdj(card.rating) * (E.NUM_MULT[okNum] || 1) * (E.PAR_MULT[okPar] || 1));
     return { uid: 'c' + Date.now().toString(36) + Math.floor(Math.random() * 1e9).toString(36),
-      cardId: snap.cardId, num: snap.num, par: snap.par || 'base', value: v0, ad: false,
-      star: snap.star || 0, starLuck: 0, grade: snap.grade || null, gradeTries: 0, src: src || null };
+      cardId: snap.cardId, num: okNum, par: okPar, value: v0, ad: false,
+      star: okStar, starLuck: 0, grade: okGrade, gradeTries: 0, src: src || null };
   }
 
   // ---------- 排行榜 dims（power 带 variant；cardvalue 取静态身价最高卡） ----------
@@ -1634,6 +1646,8 @@ if (typeof window!=="undefined") window.PORTRAITS = PORTRAITS;
   function listingEligibility(state, ins) {
     if (!ins) return { ok: false, err: '卡不存在' };
     if (ins.listed) return { ok: false, err: '这张卡已在挂牌中' };
+    var lootReg = state.meta && state.meta.arenaLoot; // 审计修复：已登记为 C 池可夺卡的卡在登记有效期（24h）内禁挂牌——否则挂牌与被夺并发会成幽灵挂单（卡已被夺走仍可售出=复制）。反向（先挂牌后登记）已由 lootCandidates 的非挂牌过滤堵住
+    if (lootReg && Date.now() - (lootReg.ts || 0) < 24 * 3600000 && (lootReg.uids || []).indexOf(ins.uid) >= 0) return { ok: false, err: '这张卡已登记为挑战可夺卡，登记期内（24 小时）不可挂牌' };
     var card = CARDS[ins.cardId];
     if (!card) return { ok: false, err: '卡不存在' };
     if (ins.src === 'market') { // 买入卡（玩家挂单/官方补货同口径）：只认转卖额度+冷却；档位门与原生卡一致
@@ -2159,7 +2173,15 @@ if (typeof window!=="undefined") window.PORTRAITS = PORTRAITS;
   function settlePending(state, balanceNow, rng) {
     var a = state.ads;
     if (!a || !a.pending) return { settled: false };
-    if (typeof balanceNow !== 'number' || a.pending.base === null) return { settled: false, kept: true };
+    var stale = Date.now() - a.pending.ts > 12 * 3600000;
+    if (a.pending.base === null) {
+      // 无基线（看广告前余额查询失败）无法做差量核对：12h 内保留待核；超 12h 按未落定过期清除。
+      // 补查修复（2026-11-03）：旧版在函数头对 base===null 直接 kept 返回，下方过期分支永不可达，
+      // 而 canUse 见 pending 即全点位拦截——容器内一旦生成 base=null 的 PENDING 即永久堵死全部广告点位。
+      if (stale) { a.pending = null; return { settled: false, expired: true }; }
+      return { settled: false, kept: true };
+    }
+    if (typeof balanceNow !== 'number') return { settled: false, kept: true };
     if (balanceNow > a.pending.base) {
       var point = a.pending.point;
       var r = grant(state, point, rng);
@@ -2167,7 +2189,7 @@ if (typeof window!=="undefined") window.PORTRAITS = PORTRAITS;
     }
     // 余额未增且标记已超过 12h:判定该次未完播,过期清除(否则 pending 会永久堵死其他点位);
     // 12h 内一律保留,防 v5.18 式"核对失败即删标记"导致真完播奖励永久丢失。
-    if (Date.now() - a.pending.ts > 12 * 3600000) { a.pending = null; return { settled: false, expired: true }; }
+    if (stale) { a.pending = null; return { settled: false, expired: true }; }
     return { settled: false, kept: true };
   }
   // 平台适配:虎扑 vatask 真桥由 platform.js 注入 window.LT_PLATFORM_ADS(仅容器内);
@@ -2340,38 +2362,57 @@ window.PAGEIMG = {"store": "data:image/webp;base64,UklGRh6IAABXRUJQVlA4IBKIAADQt
 (function (root) {
   'use strict';
   var CB = function () { return root.ColorboxAI; };
-  var CLOUD_KEY = 'lantan_save_v1';
+  var LEGACY_CLOUD_KEY = 'lantan_save_v1'; // 旧单键：仅作 1 号档的回退读（存量云备份在此键下）
+  function cloudKey(slot) { return 'lantan_save_v1_s' + slot; } // 补查修复（与足坛同口径）：云键按档位隔离——旧版三档共用单键，跨档串档且删档后云端残留会把已删档「复活」
+  function slotOf(slot) {
+    if (slot >= 1 && slot <= 3) return slot;
+    try { var m = root.LT_Save && root.LT_Save.getMeta(); if (m && m.active >= 1 && m.active <= 3) return m.active; } catch (e) {}
+    return 1;
+  }
   var lastMirror = 0;
   function inContainer() { return !!CB(); }
-  var cloudGateOpen = false, mirrorWanted = false, lastMirrorState = null;
-  function mirrorCloudSave(state, force) {
+  var cloudGateOpen = false, mirrorWanted = false, lastMirrorState = null, lastMirrorSlot = 0;
+  function mirrorCloudSave(state, force, slot) {
     var cb = CB();
     if (!cb || !cb.cloudSave || typeof cb.cloudSave.setValue !== 'function') return;
-    if (!cloudGateOpen) { mirrorWanted = true; lastMirrorState = state; return; } // 云闸(对标足坛):启动恢复完成前禁止镜像——旧版 boot 先把空档镜像上云、亲手冲掉好备份再恢复,恢复永远扑空(2026-11-02 朋友机丢档总根因)
+    if (!cloudGateOpen) { mirrorWanted = true; lastMirrorState = state; lastMirrorSlot = slotOf(slot); return; } // 云闸(对标足坛):启动恢复完成前禁止镜像——旧版 boot 先把空档镜像上云、亲手冲掉好备份再恢复,恢复永远扑空(2026-11-02 朋友机丢档总根因)
     var now = Date.now();
     if (!force && now - lastMirror < 5000) return; // 节流 5 秒(本地存档失败时 force 立即镜像)
     lastMirror = now;
     try {
-      var p = cb.cloudSave.setValue({ key: CLOUD_KEY, value: JSON.stringify(state) });
+      var p = cb.cloudSave.setValue({ key: cloudKey(slotOf(slot)), value: JSON.stringify(state) });
       if (p && p.catch) p.catch(function () {});
     } catch (e) {}
   }
-  function openCloudGate(state) {
+  function openCloudGate(state, slot) {
     if (cloudGateOpen) return; cloudGateOpen = true;
-    if (mirrorWanted) { mirrorWanted = false; var st = state || lastMirrorState; if (st) mirrorCloudSave(st, true); }
+    if (mirrorWanted) { mirrorWanted = false; var st = state || lastMirrorState; if (st) mirrorCloudSave(st, true, slot || lastMirrorSlot); }
   }
-  async function restoreCloudIfLocalFresh(local) {
+  async function restoreCloudIfLocalFresh(local, slot) {
     var cb = CB();
     if (!cb || !cb.cloudSave || typeof cb.cloudSave.getValue !== 'function') return null;
     if (local.giftClaimed || (local.cards || []).length > 0 || ((local.stats || {}).draws || 0) > 0) return null; // 本地已有进度绝不覆盖(旧口径 >5 张才算进度:只领了礼包的 5 张档被误判为空档,云恢复永远触发不了——2026-11-02 朋友机丢档根因之二)
-    try {
-      var res = await cb.cloudSave.getValue({ key: CLOUD_KEY });
-      if (res && res.code === 200 && res.data) {
-        var cloud = JSON.parse(res.data);
-        if (cloud && (cloud.giftClaimed || (cloud.cards || []).length > 0 || ((cloud.stats || {}).draws || 0) > 0)) return cloud;
-      }
-    } catch (e) {}
+    var n = slotOf(slot);
+    var keys = [cloudKey(n)]; if (n === 1) keys.push(LEGACY_CLOUD_KEY); // 1 号档回退读旧单键（存量云备份）
+    for (var i = 0; i < keys.length; i++) {
+      try {
+        var res = await cb.cloudSave.getValue({ key: keys[i] });
+        if (res && res.code === 200 && res.data) {
+          var cloud = JSON.parse(res.data);
+          if (cloud && (cloud.giftClaimed || (cloud.cards || []).length > 0 || ((cloud.stats || {}).draws || 0) > 0)) return cloud;
+        }
+      } catch (e) {}
+    }
     return null;
+  }
+  function clearCloud(slot) { // 删档墓碑（与足坛同口径）：清空该档云端值，避免下次开机被旧云档「复活」；1 号档连旧单键一并清
+    var cb = CB();
+    if (!cb || !cb.cloudSave || typeof cb.cloudSave.setValue !== 'function') return;
+    var n = slotOf(slot);
+    if (lastMirrorSlot === n) { mirrorWanted = false; lastMirrorState = null; } // 闸内待镜像的正是被删档时，一并作废防复活
+    var wipeKey = function (k) { try { var p = cb.cloudSave.setValue({ key: k, value: '' }); if (p && p.catch) p.catch(function () {}); } catch (e) {} };
+    wipeKey(cloudKey(n));
+    if (n === 1) wipeKey(LEGACY_CLOUD_KEY);
   }
   async function fetchNickname() {
     var cb = CB();
@@ -2530,7 +2571,7 @@ window.PAGEIMG = {"store": "data:image/webp;base64,UklGRh6IAABXRUJQVlA4IBKIAADQt
   function requestWipe() { wipePendingSet(true); flushWipePending(); }
 
   root.LT_Platform = { inContainer: inContainer, mirrorCloudSave: mirrorCloudSave,
-    restoreCloudIfLocalFresh: restoreCloudIfLocalFresh, openCloudGate: openCloudGate, fetchNickname: fetchNickname,
+    restoreCloudIfLocalFresh: restoreCloudIfLocalFresh, openCloudGate: openCloudGate, clearCloud: clearCloud, fetchNickname: fetchNickname,
     postPoster: postPoster, shareCard: shareCard, desktopAvailable: desktopAvailable,
     addToDesktop: addToDesktop, applySafeTop: applySafeTop,
     lbAvailable: lbAvailable, lbRequest: lbRequest, lbProfile: lbProfile,
@@ -2590,11 +2631,13 @@ window.PAGEIMG = {"store": "data:image/webp;base64,UklGRh6IAABXRUJQVlA4IBKIAADQt
     }
     return null; // 未知版本不硬读,走新档
   }
+  var _activeMem = 0; // 补查修复（与足坛 F-1 同口径）：meta 写盘被配额/隐私模式吞掉时，内存档位才是本会话真值——否则 setActive 静默失败后 save() 默认仍打到旧档位，造成跨档污染（新档进度覆写旧档、新档永不落盘）
   function getMeta() {
+    if (_activeMem >= 1 && _activeMem <= 3) return { active: _activeMem };
     try { var m = JSON.parse(global.localStorage.getItem(META_KEY)); if (m && m.active >= 1 && m.active <= 3) return m; } catch (e) {}
     return { active: 1 };
   }
-  function setActive(n) { try { global.localStorage.setItem(META_KEY, JSON.stringify({ active: n })); } catch (e) {} }
+  function setActive(n) { _activeMem = n; try { global.localStorage.setItem(META_KEY, JSON.stringify({ active: n })); } catch (e) {} }
   function migrateLegacy() {
     try {
       if (!global.localStorage.getItem(slotKey(1)) && global.localStorage.getItem(LEGACY_KEY)) {
@@ -2808,16 +2851,17 @@ window.PAGEIMG = {"store": "data:image/webp;base64,UklGRh6IAABXRUJQVlA4IBKIAADQt
   var bootCloudState = null; // 启动云恢复的存档:本地读不到时进店兜底,防被 fresh 新档冲掉(对标足坛云端对象直用)
   var $ = function (id) { return document.getElementById(id); };
   function esc(t) { return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); } // 净化（提审 XSS 建议）：补单引号转义，属性与文本两种上下文都安全；渲染结果不变（实体解码后同字）
+  function avImg(url, name) { return typeof url === 'string' && /^https?:\/\//i.test(url) ? '<img class="lb-av" src="' + esc(url) + '" alt="">' : '<span class="lb-avf">' + esc((name || '?').slice(0, 1)) + '</span>'; } // 头像渲染（与足坛同口径）：非 http(s) URL 一律不渲染图，回落首字母占位，防伪造 URL/属性逃逸
   var saveWarned = false;
   function persistNow() {
     savePending = false; lastSaveAt = Date.now();
     var ok = S.save(state);
     if (ok === false) { // 本地写不进去:立即强制云镜像兜底(容器内),并只提示一次,不再静默丢档
-      if (P) P.mirrorCloudSave(state, true);
+      if (P) P.mirrorCloudSave(state, true, S.getMeta().active);
       if (!saveWarned) { saveWarned = true; setTimeout(function () { toast(P && P.inContainer() ? '⚠ 本机存档写入失败，已改用云存档保存' : '⚠ 浏览器存储不可用，本次进度无法保存'); }, 600); }
       return;
     }
-    if (P) P.mirrorCloudSave(state);
+    if (P) P.mirrorCloudSave(state, false, S.getMeta().active);
   }
   // 性能(2026-11-03 健康分优化):存档写入防抖合并——全量 stringify+双写+回读在重度档(800+ 卡/120KB+)单次即数十 ms(Android WebView),
   // 连续操作(连卖/签到连环 save)逐次落盘是操作响应大头。口径:领先沿立即写(孤立操作零延迟落盘),400ms 窗口内的后续调用合并为一次尾沿写;
@@ -3318,12 +3362,18 @@ window.PAGEIMG = {"store": "data:image/webp;base64,UklGRh6IAABXRUJQVlA4IBKIAADQt
       } else {
         var b = document.createElement('button'); b.textContent = '卖 ' + Math.floor(g.now * E.sellRate(state)) + (g.n > 1 ? '（一张）' : '');
         var now = g.now;
+        // 出售目标（审计修复，与同面板分解/挂牌的组内连坐修复同族）：优先卖组内未被阵容/展示/王牌占用的副本，全组被占用才卖代表卡；旧实现恒卖代表卡，代表恰是首发时点「卖一张重复卡」会把首发悄悄卖掉、闲置副本反而留下
+        var occSell = {};
+        Object.keys(state.lineup || {}).forEach(function (pos) { if (state.lineup[pos]) occSell[state.lineup[pos]] = 1; });
+        (state.display || []).forEach(function (u) { occSell[u] = 1; });
+        if (state.aceUid) occSell[state.aceUid] = 1;
+        var sellTgt = members.filter(function (m) { return !occSell[m.uid]; })[0] || ins;
         b.onclick = function () {
           if ((ins.star || 0) > 0 && !confirm('这是 ★' + ins.star + ' 星级卡，出售后星级投入就没了，确认出售？')) return;
           if (ins.grade && !confirm('这是已评级【' + ins.grade + '】卡，评级投入不可恢复，确认出售？')) return;
           if ((card.rar === '传世' || ins.num === '/1') && !confirm('这是 ' + card.rar + '/' + ins.num + ' 稀有卡，确认出售？')) return;
-          state.cards.splice(state.cards.findIndex(function (c) { return c.uid === ins.uid; }), 1);
-          E.clearRefs(state, ins.uid); state.gold += Math.floor(now * E.sellRate(state));
+          state.cards.splice(state.cards.findIndex(function (c) { return c.uid === sellTgt.uid; }), 1);
+          E.clearRefs(state, sellTgt.uid); state.gold += Math.floor(now * E.sellRate(state));
           save(); toast('已出售'); showCardDetail(card); renderAllKeepScroll();
         };
         row.appendChild(b);
@@ -3521,7 +3571,7 @@ window.PAGEIMG = {"store": "data:image/webp;base64,UklGRh6IAABXRUJQVlA4IBKIAADQt
     list.forEach(function (it) {
       var snap = it.snap || {}; var card = E.CARDS[snap.cardId]; if (!card) return;
       var row = document.createElement('div'); row.className = 'row';
-      row.innerHTML = '<span>' + esc(card.name) + '（' + card.rar + ' ' + card.rating + ' · ' + snap.num + (snap.par && snap.par !== 'base' ? ' · ' + snap.par : '') + ((snap.star || 0) > 0 ? ' · ★' + snap.star : '') + (snap.grade ? ' · 🏅' + snap.grade : '') + '）<br><span style="font-size:12px;color:var(--dim)">卖家 ' + esc(it.sellerName || (it.seller && it.seller.displayName) || '虎扑用户') + '</span></span><span class="v">💎 ' + it.price + '</span>';
+      row.innerHTML = '<span>' + esc(card.name) + '（' + card.rar + ' ' + card.rating + ' · ' + esc(snap.num || '') + (snap.par && snap.par !== 'base' ? ' · ' + esc(snap.par) : '') + ((snap.star || 0) > 0 ? ' · ★' + snap.star : '') + (snap.grade ? ' · 🏅' + esc(snap.grade) : '') + '）<br><span style="font-size:12px;color:var(--dim)">卖家 ' + esc(it.sellerName || (it.seller && it.seller.displayName) || '虎扑用户') + '</span></span><span class="v">💎 ' + it.price + '</span>';
       var b = document.createElement('button'); b.textContent = '买入';
       b.onclick = function () { buyListing(it); };
       row.appendChild(b); body.appendChild(row);
@@ -3535,7 +3585,7 @@ window.PAGEIMG = {"store": "data:image/webp;base64,UklGRh6IAABXRUJQVlA4IBKIAADQt
       offs.forEach(function (it) {
         var snap = it.snap || {}; var card = E.CARDS[snap.cardId]; if (!card) return;
         var row = document.createElement('div'); row.className = 'row';
-        row.innerHTML = '<span>' + esc(card.name) + '（' + card.rar + ' ' + card.rating + ' · ' + snap.num + '）<br><span style="font-size:12px;color:var(--gold)">🏛 官方补货</span></span><span class="v">💎 ' + it.price + '</span>';
+        row.innerHTML = '<span>' + esc(card.name) + '（' + card.rar + ' ' + card.rating + ' · ' + esc(snap.num || '') + '）<br><span style="font-size:12px;color:var(--gold)">🏛 官方补货</span></span><span class="v">💎 ' + it.price + '</span>';
         var b = document.createElement('button'); b.textContent = '买入';
         b.onclick = function () { buyOfficialListing(it); };
         row.appendChild(b); body.appendChild(row);
@@ -3558,7 +3608,7 @@ window.PAGEIMG = {"store": "data:image/webp;base64,UklGRh6IAABXRUJQVlA4IBKIAADQt
     list.forEach(function (it) {
       var snap = it.snap || {}; var card = E.CARDS[snap.cardId];
       var row = document.createElement('div'); row.className = 'row';
-      var label = (card ? esc(card.name) : '卡 #' + snap.cardId) + '（' + snap.num + (snap.par && snap.par !== 'base' ? ' · ' + snap.par : '') + ((snap.star || 0) > 0 ? ' · ★' + snap.star : '') + '）· 标价 💎 ' + it.price;
+      var label = (card ? esc(card.name) : '卡 #' + snap.cardId) + '（' + esc(snap.num || '') + (snap.par && snap.par !== 'base' ? ' · ' + esc(snap.par) : '') + ((snap.star || 0) > 0 ? ' · ★' + snap.star : '') + '）· 标价 💎 ' + it.price;
       if (it.status === 'listed') {
         row.innerHTML = '<span>' + label + '<br><span style="font-size:12px;color:var(--gold)">挂牌中</span></span>';
         var b = document.createElement('button'); b.className = 'ghost'; b.textContent = '取消挂牌';
@@ -3678,7 +3728,7 @@ window.PAGEIMG = {"store": "data:image/webp;base64,UklGRh6IAABXRUJQVlA4IBKIAADQt
       me.textContent = gm ? '我的 7 日涨幅：第 ' + gm.rank + ' 名 · ' + ((gm.growth || 0) * 100).toFixed(1) + '%（+' + (gm.gain || 0) + '）' : '暂无涨幅数据：先打开榜页记录身价，几天后见分晓'; // 服务端 me 字段是 gain（旧 delta 读法恒 0）
       if (!ge.length) { list.innerHTML = '<div style="color:var(--dim)">还没有人上榜。</div>'; return; }
       list.innerHTML = ge.map(function (e) {
-        var av = e.avatar ? '<img class="lb-av" src="' + esc(e.avatar) + '" alt="">' : '<span class="lb-avf">' + esc((e.displayName || '?').slice(0, 1)) + '</span>';
+        var av = avImg(e.avatar, e.displayName);
         return '<div class="lb-row' + (e.isCurrent ? ' me' : '') + '"><span class="lb-rank">' + e.rank + '</span>' + av + '<span class="lb-name">' + esc(e.displayName || '') + (e.isCurrent ? '（我）' : '') + '</span><span class="lb-score" style="color:' + ((e.growth || 0) >= 0 ? '#7dd87d' : '#e67d7d') + '">' + ((e.growth || 0) >= 0 ? '↑ +' : '↓ ') + Math.abs((e.growth || 0) * 100).toFixed(1) + '%</span></div>';
       }).join('');
       return;
@@ -3688,7 +3738,7 @@ window.PAGEIMG = {"store": "data:image/webp;base64,UklGRh6IAABXRUJQVlA4IBKIAADQt
     var html = total < 30 ? '<div style="color:var(--dim)">榜单积累中（' + total + '/30 人），满 30 人正式开榜</div>' : '';
     if (!entries.length) html += '<div style="color:var(--dim)">还没有人上榜，来做第一个。</div>';
     html += entries.map(function (e) {
-      var av = e.avatar ? '<img class="lb-av" src="' + esc(e.avatar) + '" alt="">' : '<span class="lb-avf">' + esc((e.displayName || '?').slice(0, 1)) + '</span>';
+      var av = avImg(e.avatar, e.displayName);
       var sub = lbBoard === 'cardvalue' && e.dims && e.dims.name ? '<div class="lb-sub">' + esc(e.dims.name) + (e.dims.grade ? ' · ' + esc(e.dims.grade) : '') + '</div>' : '';
       return '<div class="lb-row' + (e.isCurrent ? ' me' : '') + '"><span class="lb-rank">' + e.rank + '</span>' + av + '<span class="lb-name">' + esc(e.displayName || '') + (e.isCurrent ? '（我）' : '') + sub + '</span><span class="lb-score">' + Number(e.score).toLocaleString() + '</span></div>';
     }).join('');
@@ -3758,7 +3808,7 @@ window.PAGEIMG = {"store": "data:image/webp;base64,UklGRh6IAABXRUJQVlA4IBKIAADQt
       var row = document.createElement('div'); row.className = 'row';
       var label = lg.kind === 'win_gold'
         ? '💰 胜场金 +' + ((lg.payload && lg.payload.gold) || B3.ARENA.B_WIN_GOLD) + ' 金币'
-        : '🃏 夺到的卡：' + (function () { var s = lg.payload && lg.payload.snap; var c = s && E.CARDS[s.cardId]; return c ? c.name + '（' + c.rar + ' · ' + s.num + '）' : '一张卡'; })();
+        : '🃏 夺到的卡：' + (function () { var s = lg.payload && lg.payload.snap; var c = s && E.CARDS[s.cardId]; return c ? esc(c.name) + '（' + c.rar + ' · ' + esc(s.num || '') + '）' : '一张卡'; })();
       row.innerHTML = '<span>' + label + '</span>';
       var b = document.createElement('button'); b.textContent = '领取';
       b.onclick = function () { claimArenaLog(lg, b); };
@@ -3770,7 +3820,22 @@ window.PAGEIMG = {"store": "data:image/webp;base64,UklGRh6IAABXRUJQVlA4IBKIAADQt
     if (!force && arenaInboxAt && Date.now() - arenaInboxAt < 15000) { renderArenaInbox(); return; }
     if (arenaBusy) return;
     arenaBusy = true;
+    // ack 分离（补查修复，与足坛 F5 同口径）：「本地已处理」与「服务端已确认」分离——
+    // 旧版处理后 fire-and-forget claim、失败被 catch 静默吞掉，服务端行永不确认，长期占未读窗口挤掉待领奖励；
+    // 且本地 arenaSeen 已置位，下次拉取连重试都不会再发。现 ack 失败入 meta.pendingAcks 持久队列，每次拉取先 flush 重试
+    // （本地已处理标记保证重试只补确认，绝不重复写信/删卡）。
+    var ackLog = function (id) {
+      P.lbRequest('/arena/claim', { logId: id }).then(function () {
+        var q = state.meta.pendingAcks || []; var ix = q.indexOf(id);
+        if (ix >= 0) { q.splice(ix, 1); save(); }
+      }).catch(function () {
+        var q = state.meta.pendingAcks = state.meta.pendingAcks || [];
+        if (q.indexOf(id) < 0) { q.push(id); save(); }
+      });
+    };
     try {
+      if (!Array.isArray(state.meta.pendingAcks)) state.meta.pendingAcks = [];
+      if (state.meta.pendingAcks.length) { var flushIds = state.meta.pendingAcks.slice(); for (var fi = 0; fi < flushIds.length; fi++) ackLog(flushIds[fi]); }
       var d = await P.lbRequest('/arena/inbox');
       var logs = (d && (d.entries || d.logs)) || (Array.isArray(d) ? d : []); // 服务端生产形状是 {entries:[...]}（旧 logs 读法恒为空，曾致战报/奖励全链路静默失效）
       arenaInboxLogs = logs; arenaInboxAt = Date.now();
@@ -3781,13 +3846,13 @@ window.PAGEIMG = {"store": "data:image/webp;base64,UklGRh6IAABXRUJQVlA4IBKIAADQt
         var p = lg.payload || {};
         if (lg.kind === 'points') { // 积分在 report 时已服务端落账：取最新一条 balance 同步本地，并 claim 清出未读窗口，防挤掉待领奖励
           if (!pointsSynced && typeof p.balance === 'number') { state.meta.arenaPoints = p.balance; pointsSynced = true; changed = true; }
-          if (!state.meta.arenaSeen[lg.id]) { state.meta.arenaSeen[lg.id] = 1; changed = true; P.lbRequest('/arena/claim', { logId: lg.id }).catch(function () {}); }
+          if (!state.meta.arenaSeen[lg.id]) { state.meta.arenaSeen[lg.id] = 1; changed = true; ackLog(lg.id); }
           return;
         }
         if (lg.kind !== 'report' || state.meta.arenaSeen[lg.id]) return;
         state.meta.arenaSeen[lg.id] = 1; changed = true;
         if (p.role === 'def') handleArenaReportLog(lg); // 只有防守战报写本地邮箱；atk 回执赛果已当场展示，只 claim ack
-        P.lbRequest('/arena/claim', { logId: lg.id }).catch(function () {}); // 处理毕服务端侧同步标已领
+        ackLog(lg.id); // 处理毕服务端侧同步标已领（失败入 pendingAcks，下次拉取重试）
       });
       if (changed) save();
       renderArenaInbox(); updateMailBadge();
@@ -3839,6 +3904,7 @@ window.PAGEIMG = {"store": "data:image/webp;base64,UklGRh6IAABXRUJQVlA4IBKIAADQt
       var body = { pool: pool, snap: a.snap, power: a.power };
       if (lootSnaps) body.lootPool = lootSnaps;
       var d = await P.lbRequest('/arena/enter', body);
+      if (pool === 'C' && lootSnaps) state.meta.arenaLoot = { uids: lootSnaps.map(function (s) { return s.uid; }), ts: Date.now() }; // 登记落盘：挂牌资格据此在 24h 内拒绝这些卡（防挂牌×被夺并发复制，见 batch3.listingEligibility）
       if (d && typeof d.points === 'number') state.meta.arenaPoints = d.points;
       save(); toast(pool + ' 池参战成功（24 小时内可被挑战）'); renderArena();
     } catch (e) { toast((e && e.message) || '参战失败'); }
@@ -3938,7 +4004,7 @@ window.PAGEIMG = {"store": "data:image/webp;base64,UklGRh6IAABXRUJQVlA4IBKIAADQt
     if ((state.meta.arenaPoints || 0) < B3.ARENA.PACK_POINTS) { toast('积分不足（需 ' + B3.ARENA.PACK_POINTS + '，现有 ' + (state.meta.arenaPoints || 0) + '）'); return; }
     try {
       var d = await P.lbRequest('/arena/spend', { points: B3.ARENA.PACK_POINTS, item: 'arena_pack' });
-      if (d && typeof d.points === 'number') state.meta.arenaPoints = d.points; else state.meta.arenaPoints -= B3.ARENA.PACK_POINTS;
+      if (d && typeof d.balance === 'number') state.meta.arenaPoints = d.balance; else state.meta.arenaPoints = Math.max(0, (state.meta.arenaPoints || 0) - B3.ARENA.PACK_POINTS); // 服务端回参是 balance（非 points）：旧读法 d.points 恒 undefined 只能本地减，本地镜像与服务端不一致（防守增减未同步）时显示余额漂移
       var before = litSet();
       var r = B3.openArenaPack(state, Math.random);
       noteDraws(r, false); save(); renderAll();
@@ -4906,7 +4972,7 @@ window.PAGEIMG = {"store": "data:image/webp;base64,UklGRh6IAABXRUJQVlA4IBKIAADQt
   $('slotList').addEventListener('click', function (e) {
     var b = e.target.closest('button'); if (!b) return;
     if (b.dataset.enter) enterSlot(+b.dataset.enter);
-    else if (b.dataset.del) { if (confirm('删除该存档？删了不能恢复')) { S.wipe(+b.dataset.del); if (P) P.requestWipe(); renderSlots(); toast('存档已删除'); } }
+    else if (b.dataset.del) { if (confirm('删除该存档？删了不能恢复')) { var dn = +b.dataset.del; S.wipe(dn); if (P && P.clearCloud) P.clearCloud(dn); if (P) P.requestWipe(); renderSlots(); toast('存档已删除'); } }
   });
   $('homeBtn').onclick = function () { flushSave(); renderSlots(); $('startOverlay').style.display = ''; window.scrollTo(0, 0); }; // 回主页先把防抖待写存档刷盘,槽位摘要读的才是最新档
   renderSlots();
@@ -4939,9 +5005,9 @@ window.PAGEIMG = {"store": "data:image/webp;base64,UklGRh6IAABXRUJQVlA4IBKIAADQt
       if (P.desktopAvailable()) $('desktopBtn').style.display = 'inline-block';
       P.fetchNickname().then(function (n) { if (n) { nickname = n; renderTop(); } });
       var gateOpened = false;
-      var openGate = function () { if (gateOpened) return; gateOpened = true; if (P.openCloudGate) P.openCloudGate(state); };
+      var openGate = function () { if (gateOpened) return; gateOpened = true; if (P.openCloudGate) P.openCloudGate(state, S.getMeta().active); };
       var gateTimer = setTimeout(openGate, 4000); // 云端无响应也不能把闸锁死
-      P.restoreCloudIfLocalFresh(state).then(function (cloud) {
+      P.restoreCloudIfLocalFresh(state, S.getMeta().active).then(function (cloud) {
         if (cloud && cloud.version >= 2) { bootCloudState = cloud; state = cloud; Y.pruneLineup(state); tick(); save(); renderAll(); toast('已恢复云存档'); }
         clearTimeout(gateTimer); openGate();
       });
